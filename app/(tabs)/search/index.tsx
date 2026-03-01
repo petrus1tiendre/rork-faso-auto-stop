@@ -1,0 +1,247 @@
+import React, { useState, useCallback } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TextInput,
+  Pressable,
+  StatusBar,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { Search, MapPin, Navigation, Zap, SlidersHorizontal } from 'lucide-react-native';
+import Colors from '@/constants/colors';
+import { useSearchTrips } from '@/providers/AppProvider';
+import TripCard from '@/components/TripCard';
+import GlassCard from '@/components/GlassCard';
+import { TripType } from '@/types';
+
+type FilterType = 'all' | TripType;
+
+export default function SearchScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const [query, setQuery] = useState<string>('');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const results = useSearchTrips(query, activeFilter);
+
+  const filters: { key: FilterType; label: string; icon: React.ReactNode }[] = [
+    { key: 'all', label: 'Tous', icon: <Zap size={13} color={activeFilter === 'all' ? Colors.background : Colors.textSecondary} /> },
+    { key: 'urbain', label: 'Urbain', icon: <MapPin size={13} color={activeFilter === 'urbain' ? Colors.background : Colors.textSecondary} /> },
+    { key: 'interville', label: 'Interville', icon: <Navigation size={13} color={activeFilter === 'interville' ? Colors.background : Colors.textSecondary} /> },
+  ];
+
+  const handleTripPress = useCallback((tripId: string) => {
+    router.push({ pathname: '/trip-details', params: { id: tripId } });
+  }, [router]);
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={['#0A0E1A', '#0D1525', '#0A0E1A']}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={['rgba(0, 168, 107, 0.06)', 'transparent']}
+        style={styles.topGlow}
+      />
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Rechercher</Text>
+        <Text style={styles.subtitle}>Trouvez votre trajet idéal</Text>
+
+        <View style={styles.searchRow}>
+          <View style={styles.searchInputContainer}>
+            <Search size={18} color={Colors.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Quartier, ville, conducteur..."
+              placeholderTextColor={Colors.textMuted}
+            />
+          </View>
+        </View>
+
+        <View style={styles.filterRow}>
+          {filters.map((f) => (
+            <Pressable
+              key={f.key}
+              onPress={() => setActiveFilter(f.key)}
+              style={[
+                styles.filterChip,
+                activeFilter === f.key && styles.filterChipActive,
+              ]}
+            >
+              {f.icon}
+              <Text
+                style={[
+                  styles.filterText,
+                  activeFilter === f.key && styles.filterTextActive,
+                ]}
+              >
+                {f.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.resultHeader}>
+          <Text style={styles.resultCount}>
+            {results.length} trajet{results.length !== 1 ? 's' : ''} trouvé{results.length !== 1 ? 's' : ''}
+          </Text>
+          <View style={styles.sortButton}>
+            <SlidersHorizontal size={14} color={Colors.textSecondary} />
+            <Text style={styles.sortText}>Trier</Text>
+          </View>
+        </View>
+
+        {results.map((trip) => (
+          <TripCard
+            key={trip.id}
+            trip={trip}
+            onPress={() => handleTripPress(trip.id)}
+          />
+        ))}
+
+        {results.length === 0 && (
+          <GlassCard style={styles.emptyCard}>
+            <Search size={40} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>Aucun résultat</Text>
+            <Text style={styles.emptySubtext}>
+              Essayez un autre quartier ou changez le filtre
+            </Text>
+          </GlassCard>
+        )}
+
+        <View style={{ height: 20 }} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  topGlow: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '800' as const,
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    marginBottom: 16,
+  },
+  searchRow: {
+    marginBottom: 14,
+  },
+  searchInputContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: Colors.text,
+  },
+  filterRow: {
+    flexDirection: 'row' as const,
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  filterChipActive: {
+    backgroundColor: Colors.green,
+    borderColor: Colors.green,
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: Colors.textSecondary,
+  },
+  filterTextActive: {
+    color: Colors.background,
+  },
+  resultHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: 12,
+  },
+  resultCount: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '500' as const,
+  },
+  sortButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  sortText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500' as const,
+  },
+  emptyCard: {
+    alignItems: 'center' as const,
+    paddingVertical: 40,
+    gap: 10,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.textSecondary,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: 'center' as const,
+  },
+});
