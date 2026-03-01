@@ -1,127 +1,72 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
-import { trpc } from '@/lib/trpc';
 import { Trip, TripType, ChatConversation, UserProfile } from '@/types';
+import { mockTrips, mockChats, mockProfile } from '@/mocks/trips';
 
 const FAVORITES_KEY = 'faso_autostop_favorites';
-
-const defaultProfile: UserProfile = {
-  id: 'u1',
-  name: 'Ousmane Kaboré',
-  phone: '+226 70 12 34 56',
-  avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&crop=face',
-  rating: 4.7,
-  tripsCompleted: 23,
-  verified: true,
-  memberSince: 'Janvier 2026',
-  bulletin3Uploaded: true,
-};
+const TRIPS_KEY = 'faso_autostop_trips';
 
 export const [AppProvider, useApp] = createContextHook(() => {
-  const queryClient = useQueryClient();
+  const [trips, setTrips] = useState<Trip[]>(mockTrips);
+  const [chats] = useState<ChatConversation[]>(mockChats);
+  const [profile] = useState<UserProfile>(mockProfile);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isOffline, setIsOffline] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-
-  const tripsQuery = trpc.trips.list.useQuery(undefined, {
-    staleTime: 30_000,
-    retry: 2,
-    meta: { offline: true },
-  });
-
-  const chatsQuery = trpc.chats.list.useQuery(undefined, {
-    staleTime: 30_000,
-    retry: 2,
-  });
-
-  const profileQuery = trpc.profile.get.useQuery(undefined, {
-    staleTime: 60_000,
-    retry: 2,
-  });
-
-  const createTripMutation = trpc.trips.create.useMutation({
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [['trips', 'list']] });
-      console.log('[AppProvider] Trip created on backend, invalidating cache');
-    },
-    onError: (error) => {
-      console.log('[AppProvider] Trip creation failed:', error.message);
-    },
-  });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
 
   useEffect(() => {
-    const loadFavorites = async () => {
+    const loadData = async () => {
       try {
-        const stored = await AsyncStorage.getItem(FAVORITES_KEY);
-        if (stored) {
-          setFavorites(JSON.parse(stored) as string[]);
+        const [storedFavs, storedTrips] = await Promise.all([
+          AsyncStorage.getItem(FAVORITES_KEY),
+          AsyncStorage.getItem(TRIPS_KEY),
+        ]);
+        if (storedFavs) {
+          setFavorites(JSON.parse(storedFavs) as string[]);
+        }
+        if (storedTrips) {
+          const parsed = JSON.parse(storedTrips) as Trip[];
+          const mergedIds = new Set(mockTrips.map(t => t.id));
+          const userTrips = parsed.filter(t => !mergedIds.has(t.id));
+          setTrips([...mockTrips, ...userTrips]);
         }
       } catch (e) {
-        console.log('[AppProvider] Failed to load favorites:', e);
+        console.log('[AppProvider] Failed to load stored data:', e);
+      } finally {
+        setIsLoading(false);
       }
     };
-    loadFavorites();
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (tripsQuery.isError) {
-      setIsOffline(true);
-      console.log('[AppProvider] Backend unreachable, switching to offline mode');
-    } else if (tripsQuery.isSuccess) {
-      if (isOffline) {
-        setIsSyncing(true);
-        setTimeout(() => {
-          setIsSyncing(false);
-          setIsOffline(false);
-          console.log('[AppProvider] Back online, sync complete');
-        }, 1500);
-      }
-    }
-  }, [tripsQuery.isError, tripsQuery.isSuccess, isOffline]);
-
-  const trips: Trip[] = useMemo(() => {
-    return tripsQuery.data ?? [];
-  }, [tripsQuery.data]);
-
-  const chats: ChatConversation[] = useMemo(() => {
-    return chatsQuery.data ?? [];
-  }, [chatsQuery.data]);
-
-  const profile: UserProfile = useMemo(() => {
-    return profileQuery.data ?? defaultProfile;
-  }, [profileQuery.data]);
-
   const addTrip = useCallback((trip: Trip) => {
-    createTripMutation.mutate({
-      type: trip.type,
-      departure: trip.departure,
-      arrival: trip.arrival,
-      date: trip.date,
-      time: trip.time,
-      seats: trip.seats,
-      price: trip.price,
-      comments: trip.comments,
-      driverName: trip.driverName,
-      driverAvatar: trip.driverAvatar,
-      driverRating: trip.driverRating,
-      driverTrips: trip.driverTrips,
-      verified: trip.verified,
+    setIsPublishing(true);
+    setTrips(prev => {
+      const updated = [trip, ...prev];
+      AsyncStorage.setItem(TRIPS_KEY, JSON.stringify(updated)).catch(e => {
+        console.log('[AppProvider] Failed to save trips:', e);
+      });
+      return updated;
     });
-    console.log('[AppProvider] Trip submitted to backend');
-  }, [createTripMutation]);
+    setTimeout(() => setIsPublishing(false), 300);
+    console.log('[AppProvider] Trip added locally');
+  }, []);
 
   const toggleFavorite = useCallback((tripId: string) => {
-    const updated = favorites.includes(tripId)
-      ? favorites.filter(id => id !== tripId)
-      : [...favorites, tripId];
-    setFavorites(updated);
-    AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated)).catch((e) => {
-      console.log('[AppProvider] Failed to save favorites:', e);
+    setFavorites(prev => {
+      const updated = prev.includes(tripId)
+        ? prev.filter(id => id !== tripId)
+        : [...prev, tripId];
+      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated)).catch(e => {
+        console.log('[AppProvider] Failed to save favorites:', e);
+      });
+      return updated;
     });
     console.log('[AppProvider] Favorite toggled:', tripId);
-  }, [favorites]);
+  }, []);
 
   const isFavorite = useCallback((tripId: string) => {
     return favorites.includes(tripId);
@@ -139,8 +84,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isFavorite,
     setIsOffline,
     setIsSyncing,
-    isLoading: tripsQuery.isLoading,
-    isPublishing: createTripMutation.isPending,
+    isLoading,
+    isPublishing,
   };
 });
 
