@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   Animated,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,9 +25,13 @@ type FilterType = 'all' | TripType;
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isOffline, isSyncing } = useApp();
+  const { isOffline, isSyncing, trips, isLoading } = useApp();
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const filteredTrips = useFilteredTrips(activeFilter);
+
+  const totalTrips = trips.length;
+  const intervilleCount = useMemo(() => trips.filter(t => t.type === 'interville').length, [trips]);
+  const urbainCount = useMemo(() => trips.filter(t => t.type === 'urbain').length, [trips]);
   const headerOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -78,17 +83,17 @@ export default function HomeScreen() {
         <GlassCard variant="accent" style={styles.statsCard}>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>6</Text>
+              <Text style={styles.statNumber}>{totalTrips}</Text>
               <Text style={styles.statLabel}>Trajets dispo</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: Colors.accent }]}>2</Text>
+              <Text style={[styles.statNumber, { color: Colors.accent }]}>{intervilleCount}</Text>
               <Text style={styles.statLabel}>Interville</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: Colors.green }]}>4</Text>
+              <Text style={[styles.statNumber, { color: Colors.green }]}>{urbainCount}</Text>
               <Text style={styles.statLabel}>Urbain</Text>
             </View>
           </View>
@@ -118,6 +123,13 @@ export default function HomeScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>Trajets disponibles</Text>
+
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Chargement depuis le serveur...</Text>
+          </View>
+        )}
 
         {filteredTrips.map((trip) => (
           <TripCard
@@ -254,5 +266,15 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 6,
     textAlign: 'center' as const,
+  },
+  loadingContainer: {
+    alignItems: 'center' as const,
+    paddingVertical: 32,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '500' as const,
   },
 });

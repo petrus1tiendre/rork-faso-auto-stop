@@ -8,6 +8,7 @@ import {
   Pressable,
   Alert,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,7 +23,7 @@ import { Trip, TripType } from '@/types';
 
 export default function PublishScreen() {
   const insets = useSafeAreaInsets();
-  const { addTrip, profile } = useApp();
+  const { addTrip, profile, isPublishing } = useApp();
 
   const [tripType, setTripType] = useState<TripType>('urbain');
   const [departure, setDeparture] = useState<string>('');
@@ -240,15 +241,19 @@ export default function PublishScreen() {
           />
         </GlassCard>
 
-        <Pressable onPress={handlePublish} style={styles.publishButton}>
+        <Pressable onPress={handlePublish} style={[styles.publishButton, isPublishing && { opacity: 0.7 }]} disabled={isPublishing}>
           <LinearGradient
             colors={[Colors.primary, Colors.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.publishGradient}
           >
-            <Car size={18} color={Colors.white} />
-            <Text style={styles.publishText}>Publier le trajet</Text>
+            {isPublishing ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Car size={18} color={Colors.white} />
+            )}
+            <Text style={styles.publishText}>{isPublishing ? 'Publication...' : 'Publier le trajet'}</Text>
           </LinearGradient>
         </Pressable>
 
