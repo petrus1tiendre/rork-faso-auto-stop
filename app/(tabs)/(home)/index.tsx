@@ -8,6 +8,7 @@ import {
   Animated,
   StatusBar,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +26,14 @@ type FilterType = 'all' | TripType;
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isOffline, isSyncing, trips, isLoading } = useApp();
+  const { isOffline, isSyncing, trips, isLoading, refetchTrips } = useApp();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    refetchTrips();
+    setTimeout(() => setRefreshing(false), 1000);
+  }, [refetchTrips]);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const filteredTrips = useFilteredTrips(activeFilter);
 
@@ -71,6 +79,14 @@ export default function HomeScreen() {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
       >
         <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
           <Text style={styles.greeting}>Salut !</Text>

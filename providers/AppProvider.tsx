@@ -2,58 +2,149 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { Trip, TripType, ChatConversation, UserProfile } from '@/types';
-import { mockTrips, mockChats, mockProfile } from '@/mocks/trips';
+import { trpc } from '@/lib/trpc';
 
 const FAVORITES_KEY = 'faso_autostop_favorites';
-const TRIPS_KEY = 'faso_autostop_trips';
+
+const defaultProfile: UserProfile = {
+  id: 'u1',
+  name: 'Ousmane Kaboré',
+  phone: '+226 70 12 34 56',
+  avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&crop=face',
+  rating: 4.7,
+  tripsCompleted: 23,
+  verified: true,
+  memberSince: 'Janvier 2026',
+  bulletin3Uploaded: true,
+};
 
 export const [AppProvider, useApp] = createContextHook(() => {
-  const [trips, setTrips] = useState<Trip[]>(mockTrips);
-  const [chats] = useState<ChatConversation[]>(mockChats);
-  const [profile] = useState<UserProfile>(mockProfile);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isOffline, setIsOffline] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isPublishing, setIsPublishing] = useState<boolean>(false);
+
+  const tripsQuery = trpc.trips.list.useQuery(
+    { type: 'all', query: '' },
+    {
+      refetchOnWindowFocus: true,
+      refetchInterval: 60000,
+    }
+  );
+
+  const chatsQuery = trpc.chats.list.useQuery(undefined, {
+    refetchInterval: 30000,
+  });
+
+  const profileQuery = trpc.profile.get.useQuery();
+
+  const createTripMutation = trpc.trips.create.useMutation({
+    onSuccess: () => {
+      console.log('[AppProvider] Trip created on backend, refetching...');
+      tripsQuery.refetch();
+    },
+    onError: (error) => {
+      console.log('[AppProvider] Failed to create trip on backend:', error.message);
+    },
+  });
+
+  const trips: Trip[] = useMemo(() => {
+    if (tripsQuery.data) {
+      return tripsQuery.data.map((t) => ({
+        id: t.id,
+        type: t.type,
+        departure: t.departure,
+        arrival: t.arrival,
+        date: t.date,
+        time: t.time,
+        seats: t.seats,
+        seatsAvailable: t.seatsAvailable,
+        price: t.price,
+        driverName: t.driverName,
+        driverAvatar: t.driverAvatar,
+        driverRating: t.driverRating,
+        driverTrips: t.driverTrips,
+        verified: t.verified,
+        comments: t.comments,
+        createdAt: t.createdAt,
+      }));
+    }
+    return [];
+  }, [tripsQuery.data]);
+
+  const chats: ChatConversation[] = useMemo(() => {
+    if (chatsQuery.data) {
+      return chatsQuery.data.map((c) => ({
+        id: c.id,
+        tripId: c.tripId,
+        otherUser: c.otherUser,
+        otherAvatar: c.otherAvatar,
+        lastMessage: c.lastMessage,
+        lastMessageTime: c.lastMessageTime,
+        unread: c.unread,
+        tripSummary: c.tripSummary,
+      }));
+    }
+    return [];
+  }, [chatsQuery.data]);
+
+  const profile: UserProfile = useMemo(() => {
+    if (profileQuery.data) {
+      return {
+        id: profileQuery.data.id,
+        name: profileQuery.data.name,
+        phone: profileQuery.data.phone,
+        avatar: profileQuery.data.avatar,
+        rating: profileQuery.data.rating,
+        tripsCompleted: profileQuery.data.tripsCompleted,
+        verified: profileQuery.data.verified,
+        memberSince: profileQuery.data.memberSince,
+        bulletin3Uploaded: profileQuery.data.bulletin3Uploaded,
+      };
+    }
+    return defaultProfile;
+  }, [profileQuery.data]);
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadFavorites = async () => {
       try {
-        const [storedFavs, storedTrips] = await Promise.all([
-          AsyncStorage.getItem(FAVORITES_KEY),
-          AsyncStorage.getItem(TRIPS_KEY),
-        ]);
+        const storedFavs = await AsyncStorage.getItem(FAVORITES_KEY);
         if (storedFavs) {
           setFavorites(JSON.parse(storedFavs) as string[]);
         }
-        if (storedTrips) {
-          const parsed = JSON.parse(storedTrips) as Trip[];
-          const mergedIds = new Set(mockTrips.map(t => t.id));
-          const userTrips = parsed.filter(t => !mergedIds.has(t.id));
-          setTrips([...mockTrips, ...userTrips]);
-        }
       } catch (e) {
-        console.log('[AppProvider] Failed to load stored data:', e);
-      } finally {
-        setIsLoading(false);
+        console.log('[AppProvider] Failed to load favorites:', e);
       }
     };
-    loadData();
+    loadFavorites();
   }, []);
 
+  useEffect(() => {
+    if (tripsQuery.isError) {
+      setIsOffline(true);
+      console.log('[AppProvider] Backend unreachable, offline mode');
+    } else if (tripsQuery.isSuccess) {
+      setIsOffline(false);
+    }
+  }, [tripsQuery.isError, tripsQuery.isSuccess]);
+
   const addTrip = useCallback((trip: Trip) => {
-    setIsPublishing(true);
-    setTrips(prev => {
-      const updated = [trip, ...prev];
-      AsyncStorage.setItem(TRIPS_KEY, JSON.stringify(updated)).catch(e => {
-        console.log('[AppProvider] Failed to save trips:', e);
-      });
-      return updated;
+    console.log('[AppProvider] Creating trip on backend...');
+    createTripMutation.mutate({
+      type: trip.type,
+      departure: trip.departure,
+      arrival: trip.arrival,
+      date: trip.date,
+      time: trip.time,
+      seats: trip.seats,
+      price: trip.price,
+      comments: trip.comments,
+      driverName: trip.driverName,
+      driverAvatar: trip.driverAvatar,
+      driverRating: trip.driverRating,
+      driverTrips: trip.driverTrips,
+      verified: trip.verified,
     });
-    setTimeout(() => setIsPublishing(false), 300);
-    console.log('[AppProvider] Trip added locally');
-  }, []);
+  }, [createTripMutation]);
 
   const toggleFavorite = useCallback((tripId: string) => {
     setFavorites(prev => {
@@ -65,12 +156,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
       });
       return updated;
     });
-    console.log('[AppProvider] Favorite toggled:', tripId);
   }, []);
 
   const isFavorite = useCallback((tripId: string) => {
     return favorites.includes(tripId);
   }, [favorites]);
+
+  const refetchTrips = useCallback(() => {
+    setIsSyncing(true);
+    tripsQuery.refetch().finally(() => setIsSyncing(false));
+  }, [tripsQuery]);
 
   return {
     trips,
@@ -84,8 +179,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isFavorite,
     setIsOffline,
     setIsSyncing,
-    isLoading,
-    isPublishing,
+    isLoading: tripsQuery.isLoading,
+    isPublishing: createTripMutation.isPending,
+    refetchTrips,
+    refetchChats: chatsQuery.refetch,
+    refetchProfile: profileQuery.refetch,
   };
 });
 

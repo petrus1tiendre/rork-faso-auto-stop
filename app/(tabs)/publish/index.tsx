@@ -63,7 +63,7 @@ export default function PublishScreen() {
 
     addTrip(newTrip);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Trajet publié !', 'Votre trajet est maintenant visible par les passagers.');
+    Alert.alert('Trajet publié !', 'Votre trajet a été envoyé au serveur et sera visible par les passagers.');
 
     setDeparture('');
     setArrival('');
@@ -73,7 +73,7 @@ export default function PublishScreen() {
     setPrice('');
     setComments('');
 
-    console.log('[PublishScreen] Trip published:', newTrip.id);
+    console.log('[PublishScreen] Trip published via backend');
   }, [tripType, departure, arrival, date, time, seats, price, comments, addTrip, profile]);
 
   return (

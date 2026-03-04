@@ -7,13 +7,14 @@ import {
   TextInput,
   Pressable,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Search, MapPin, Navigation, Zap, SlidersHorizontal } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useSearchTrips } from '@/providers/AppProvider';
+import { useSearchTrips, useApp } from '@/providers/AppProvider';
 import TripCard from '@/components/TripCard';
 import GlassCard from '@/components/GlassCard';
 import { TripType } from '@/types';
@@ -26,6 +27,14 @@ export default function SearchScreen() {
   const [query, setQuery] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const results = useSearchTrips(query, activeFilter);
+  const { refetchTrips } = useApp();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    refetchTrips();
+    setTimeout(() => setRefreshing(false), 1000);
+  }, [refetchTrips]);
 
   const filters: { key: FilterType; label: string; icon: React.ReactNode }[] = [
     { key: 'all', label: 'Tous', icon: <Zap size={13} color={activeFilter === 'all' ? Colors.background : Colors.textSecondary} /> },
@@ -54,6 +63,14 @@ export default function SearchScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
       >
         <Text style={styles.title}>Rechercher</Text>
         <Text style={styles.subtitle}>Trouvez votre trajet idéal</Text>
