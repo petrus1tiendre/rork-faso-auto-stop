@@ -10,12 +10,15 @@ const getBaseUrl = () => {
   const url = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
 
   if (!url) {
-    throw new Error(
-      "Rork did not set EXPO_PUBLIC_RORK_API_BASE_URL, please use support",
-    );
+    console.warn('[trpc] EXPO_PUBLIC_RORK_API_BASE_URL not set, backend calls will fail gracefully');
+    return '';
   }
 
   return url;
+};
+
+export const isBackendConfigured = () => {
+  return !!process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
 };
 
 export const trpcClient = trpc.createClient({

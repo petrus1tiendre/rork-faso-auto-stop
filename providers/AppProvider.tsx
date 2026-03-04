@@ -2,40 +2,39 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { Trip, TripType, ChatConversation, UserProfile } from '@/types';
-import { trpc } from '@/lib/trpc';
+import { trpc, isBackendConfigured } from '@/lib/trpc';
+import { mockTrips, mockChats, mockProfile } from '@/mocks/trips';
 
 const FAVORITES_KEY = 'faso_autostop_favorites';
 
-const defaultProfile: UserProfile = {
-  id: 'u1',
-  name: 'Ousmane Kaboré',
-  phone: '+226 70 12 34 56',
-  avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&crop=face',
-  rating: 4.7,
-  tripsCompleted: 23,
-  verified: true,
-  memberSince: 'Janvier 2026',
-  bulletin3Uploaded: true,
-};
 
 export const [AppProvider, useApp] = createContextHook(() => {
+  const backendReady = isBackendConfigured();
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [isOffline, setIsOffline] = useState<boolean>(false);
+  const [isOffline, setIsOffline] = useState<boolean>(!backendReady);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [localTrips, setLocalTrips] = useState<Trip[]>(mockTrips);
 
   const tripsQuery = trpc.trips.list.useQuery(
     { type: 'all', query: '' },
     {
+      enabled: backendReady,
       refetchOnWindowFocus: true,
       refetchInterval: 60000,
+      retry: 1,
     }
   );
 
   const chatsQuery = trpc.chats.list.useQuery(undefined, {
+    enabled: backendReady,
     refetchInterval: 30000,
+    retry: 1,
   });
 
-  const profileQuery = trpc.profile.get.useQuery();
+  const profileQuery = trpc.profile.get.useQuery(undefined, {
+    enabled: backendReady,
+    retry: 1,
+  });
 
   const createTripMutation = trpc.trips.create.useMutation({
     onSuccess: () => {
@@ -48,7 +47,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   });
 
   const trips: Trip[] = useMemo(() => {
-    if (tripsQuery.data) {
+    if (backendReady && tripsQuery.data) {
       return tripsQuery.data.map((t) => ({
         id: t.id,
         type: t.type,
@@ -68,11 +67,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
         createdAt: t.createdAt,
       }));
     }
-    return [];
-  }, [tripsQuery.data]);
+    return localTrips;
+  }, [tripsQuery.data, backendReady, localTrips]);
 
   const chats: ChatConversation[] = useMemo(() => {
-    if (chatsQuery.data) {
+    if (backendReady && chatsQuery.data) {
       return chatsQuery.data.map((c) => ({
         id: c.id,
         tripId: c.tripId,
@@ -84,11 +83,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
         tripSummary: c.tripSummary,
       }));
     }
-    return [];
-  }, [chatsQuery.data]);
+    return mockChats;
+  }, [chatsQuery.data, backendReady]);
 
   const profile: UserProfile = useMemo(() => {
-    if (profileQuery.data) {
+    if (backendReady && profileQuery.data) {
       return {
         id: profileQuery.data.id,
         name: profileQuery.data.name,
@@ -101,8 +100,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
         bulletin3Uploaded: profileQuery.data.bulletin3Uploaded,
       };
     }
-    return defaultProfile;
-  }, [profileQuery.data]);
+    return mockProfile;
+  }, [profileQuery.data, backendReady]);
 
   useEffect(() => {
     const loadFavorites = async () => {
@@ -128,23 +127,28 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, [tripsQuery.isError, tripsQuery.isSuccess]);
 
   const addTrip = useCallback((trip: Trip) => {
-    console.log('[AppProvider] Creating trip on backend...');
-    createTripMutation.mutate({
-      type: trip.type,
-      departure: trip.departure,
-      arrival: trip.arrival,
-      date: trip.date,
-      time: trip.time,
-      seats: trip.seats,
-      price: trip.price,
-      comments: trip.comments,
-      driverName: trip.driverName,
-      driverAvatar: trip.driverAvatar,
-      driverRating: trip.driverRating,
-      driverTrips: trip.driverTrips,
-      verified: trip.verified,
-    });
-  }, [createTripMutation]);
+    if (backendReady) {
+      console.log('[AppProvider] Creating trip on backend...');
+      createTripMutation.mutate({
+        type: trip.type,
+        departure: trip.departure,
+        arrival: trip.arrival,
+        date: trip.date,
+        time: trip.time,
+        seats: trip.seats,
+        price: trip.price,
+        comments: trip.comments,
+        driverName: trip.driverName,
+        driverAvatar: trip.driverAvatar,
+        driverRating: trip.driverRating,
+        driverTrips: trip.driverTrips,
+        verified: trip.verified,
+      });
+    } else {
+      console.log('[AppProvider] Backend not configured, saving trip locally');
+      setLocalTrips(prev => [trip, ...prev]);
+    }
+  }, [createTripMutation, backendReady]);
 
   const toggleFavorite = useCallback((tripId: string) => {
     setFavorites(prev => {
@@ -163,9 +167,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, [favorites]);
 
   const refetchTrips = useCallback(() => {
+    if (!backendReady) {
+      console.log('[AppProvider] Backend not configured, skipping refetch');
+      return;
+    }
     setIsSyncing(true);
     tripsQuery.refetch().finally(() => setIsSyncing(false));
-  }, [tripsQuery]);
+  }, [tripsQuery, backendReady]);
 
   return {
     trips,
@@ -179,7 +187,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isFavorite,
     setIsOffline,
     setIsSyncing,
-    isLoading: tripsQuery.isLoading,
+    isLoading: backendReady ? tripsQuery.isLoading : false,
     isPublishing: createTripMutation.isPending,
     refetchTrips,
     refetchChats: chatsQuery.refetch,
