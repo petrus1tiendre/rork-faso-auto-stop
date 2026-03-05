@@ -1,22 +1,48 @@
 export type TripType = 'urbain' | 'interville';
 
+export interface Profile {
+  id: string;
+  phone: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  is_verified: boolean;
+  rating: number;
+  total_trips: number;
+  created_at: string;
+}
+
 export interface Trip {
   id: string;
+  user_id: string;
   type: TripType;
   departure: string;
   arrival: string;
-  date: string;
-  time: string;
+  trip_date: string;
+  trip_time: string;
   seats: number;
-  seatsAvailable: number;
-  price: number;
-  driverName: string;
-  driverAvatar: string;
-  driverRating: number;
-  driverTrips: number;
-  verified: boolean;
-  comments: string;
-  createdAt: string;
+  price_fcfa: number;
+  comment: string | null;
+  status: string;
+  created_at: string;
+  profiles?: Profile | null;
+}
+
+export interface Booking {
+  id: string;
+  trip_id: string;
+  passenger_id: string;
+  status: string;
+  created_at: string;
+  trips?: Trip | null;
+  profiles?: Profile | null;
+}
+
+export interface Message {
+  id: string;
+  booking_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
 }
 
 export interface ChatConversation {
@@ -28,24 +54,4 @@ export interface ChatConversation {
   lastMessageTime: string;
   unread: number;
   tripSummary: string;
-}
-
-export interface Message {
-  id: string;
-  senderId: string;
-  text: string;
-  timestamp: string;
-  isPaymentLink?: boolean;
-}
-
-export interface UserProfile {
-  id: string;
-  name: string;
-  phone: string;
-  avatar: string;
-  rating: number;
-  tripsCompleted: number;
-  verified: boolean;
-  memberSince: string;
-  bulletin3Uploaded: boolean;
 }

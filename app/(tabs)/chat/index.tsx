@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,24 +6,85 @@ import {
   ScrollView,
   Pressable,
   StatusBar,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
-import { MessageCircle, Phone, ChevronRight } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
+import { MessageCircle, Phone } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
+import { supabase } from '@/lib/supabase';
+import { useQuery } from '@tanstack/react-query';
+
+interface BookingChat {
+  id: string;
+  trip_id: string;
+  status: string;
+  created_at: string;
+  trips: {
+    departure: string;
+    arrival: string;
+    trip_date: string;
+    profiles: {
+      full_name: string | null;
+      avatar_url: string | null;
+    } | null;
+  } | null;
+}
+
+async function fetchBookings(userId: string | null): Promise<BookingChat[]> {
+  if (!userId) return [];
+  console.log('[Chat] Fetching bookings for:', userId);
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(`
+      id,
+      trip_id,
+      status,
+      created_at,
+      trips (
+        departure,
+        arrival,
+        trip_date,
+        profiles (
+          full_name,
+          avatar_url
+        )
+      )
+    `)
+    .eq('passenger_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.log('[Chat] Bookings error:', error.message);
+    return [];
+  }
+
+  return (data ?? []) as unknown as BookingChat[];
+}
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { chats } = useApp();
+  const { userId } = useApp();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleChatPress = (chatId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    console.log('[ChatScreen] Opening chat:', chatId);
-  };
+  const bookingsQuery = useQuery({
+    queryKey: ['bookings', userId],
+    queryFn: () => fetchBookings(userId),
+    enabled: !!userId,
+    staleTime: 30000,
+  });
+
+  const { data: bookingsData, isLoading: bookingsLoading, refetch } = bookingsQuery;
+  const bookings = bookingsData ?? [];
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
   return (
     <View style={styles.container}>
@@ -41,6 +102,14 @@ export default function ChatScreen() {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
       >
         <Text style={styles.title}>Messages</Text>
         <Text style={styles.subtitle}>Vos conversations de trajet</Text>
@@ -57,41 +126,33 @@ export default function ChatScreen() {
           </View>
         </GlassCard>
 
-        {chats.map((chat) => (
-          <Pressable
-            key={chat.id}
-            onPress={() => handleChatPress(chat.id)}
-          >
+        {bookingsLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        )}
+
+        {!bookingsLoading && bookings.length > 0 && bookings.map((booking) => (
+          <Pressable key={booking.id} onPress={() => console.log('[Chat] Open booking:', booking.id)}>
             <GlassCard style={styles.chatCard}>
               <View style={styles.chatRow}>
-                <View style={styles.avatarContainer}>
-                  <Image source={{ uri: chat.otherAvatar }} style={styles.avatar} />
-                  {chat.unread > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>{chat.unread}</Text>
-                    </View>
-                  )}
-                </View>
                 <View style={styles.chatInfo}>
-                  <View style={styles.chatNameRow}>
-                    <Text style={styles.chatName}>{chat.otherUser}</Text>
-                    <Text style={styles.chatTime}>{chat.lastMessageTime}</Text>
-                  </View>
-                  <Text style={styles.chatTrip}>{chat.tripSummary}</Text>
-                  <Text
-                    style={[styles.chatMessage, chat.unread > 0 && styles.chatMessageUnread]}
-                    numberOfLines={1}
-                  >
-                    {chat.lastMessage}
+                  <Text style={styles.chatName}>
+                    {booking.trips?.profiles?.full_name ?? 'Conducteur'}
+                  </Text>
+                  <Text style={styles.chatTrip}>
+                    {booking.trips?.departure ?? ''} → {booking.trips?.arrival ?? ''}
+                  </Text>
+                  <Text style={styles.chatStatus}>
+                    Statut: {booking.status === 'pending' ? 'En attente' : booking.status === 'confirmed' ? 'Confirmé' : booking.status}
                   </Text>
                 </View>
-                <ChevronRight size={16} color={Colors.textMuted} />
               </View>
             </GlassCard>
           </Pressable>
         ))}
 
-        {chats.length === 0 && (
+        {!bookingsLoading && bookings.length === 0 && (
           <GlassCard style={styles.emptyCard}>
             <MessageCircle size={40} color={Colors.textMuted} />
             <Text style={styles.emptyText}>Aucune conversation</Text>
@@ -157,6 +218,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  loadingContainer: {
+    alignItems: 'center' as const,
+    paddingVertical: 32,
+  },
   chatCard: {
     marginBottom: 10,
   },
@@ -165,65 +230,24 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     gap: 12,
   },
-  avatarContainer: {
-    position: 'relative' as const,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(66, 165, 245, 0.25)',
-  },
-  unreadBadge: {
-    position: 'absolute' as const,
-    top: -2,
-    right: -2,
-    backgroundColor: Colors.primary,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    borderWidth: 2,
-    borderColor: Colors.white,
-  },
-  unreadText: {
-    fontSize: 10,
-    fontWeight: '700' as const,
-    color: Colors.white,
-  },
   chatInfo: {
     flex: 1,
-  },
-  chatNameRow: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
   },
   chatName: {
     fontSize: 15,
     fontWeight: '600' as const,
     color: Colors.text,
   },
-  chatTime: {
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
   chatTrip: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.primary,
     fontWeight: '500' as const,
-    marginTop: 1,
-  },
-  chatMessage: {
-    fontSize: 13,
-    color: Colors.textMuted,
     marginTop: 2,
   },
-  chatMessageUnread: {
-    color: Colors.textSecondary,
-    fontWeight: '600' as const,
+  chatStatus: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
   emptyCard: {
     alignItems: 'center' as const,

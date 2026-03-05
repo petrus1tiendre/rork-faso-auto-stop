@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -57,7 +58,7 @@ function MenuItem({ icon, label, sublabel, onPress, danger, badge }: MenuItemPro
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile } = useApp();
+  const { profile, signOut, session } = useApp();
 
   const handleSignal = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -79,6 +80,43 @@ export default function ProfileScreen() {
     );
   }, []);
 
+  const handleLogout = useCallback(() => {
+    Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Oui',
+        style: 'destructive',
+        onPress: () => {
+          console.log('[Profile] Logging out...');
+          signOut();
+        },
+      },
+    ]);
+  }, [signOut]);
+
+  const displayName = profile?.full_name ?? 'Utilisateur';
+  const displayEmail = session?.user?.email ?? '';
+  const displayAvatar = profile?.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face';
+  const isVerified = profile?.is_verified ?? false;
+  const rating = profile?.rating ?? 5.0;
+  const totalTrips = profile?.total_trips ?? 0;
+  const memberSince = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    : '';
+
+  if (!profile && session) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <LinearGradient
+          colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+          style={StyleSheet.absoluteFill}
+        />
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={{ color: Colors.textSecondary, marginTop: 12 }}>Chargement du profil...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -99,39 +137,39 @@ export default function ProfileScreen() {
         <GlassCard variant="accent" style={styles.profileCard}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarWrapper}>
-              <Image source={{ uri: profile.avatar }} style={styles.avatar} />
-              {profile.verified && (
+              <Image source={{ uri: displayAvatar }} style={styles.avatar} />
+              {isVerified && (
                 <View style={styles.verifiedBadge}>
                   <BadgeCheck size={16} color={Colors.primary} fill={Colors.white} />
                 </View>
               )}
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profile.name}</Text>
-              <Text style={styles.profilePhone}>{profile.phone}</Text>
+              <Text style={styles.profileName}>{displayName}</Text>
+              <Text style={styles.profilePhone}>{displayEmail}</Text>
               <View style={styles.ratingRow}>
                 <Star size={13} color={Colors.orange} fill={Colors.orange} />
-                <Text style={styles.ratingText}>{profile.rating}</Text>
+                <Text style={styles.ratingText}>{rating}</Text>
                 <Text style={styles.ratingDot}>·</Text>
-                <Text style={styles.tripCount}>{profile.tripsCompleted} trajets</Text>
+                <Text style={styles.tripCount}>{totalTrips} trajets</Text>
               </View>
             </View>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.tripsCompleted}</Text>
+              <Text style={styles.statValue}>{totalTrips}</Text>
               <Text style={styles.statLabel}>Trajets</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: Colors.orange }]}>{profile.rating}</Text>
+              <Text style={[styles.statValue, { color: Colors.orange }]}>{rating}</Text>
               <Text style={styles.statLabel}>Note</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: Colors.green }]}>
-                {profile.verified ? 'Oui' : 'Non'}
+                {isVerified ? 'Oui' : 'Non'}
               </Text>
               <Text style={styles.statLabel}>Vérifié</Text>
             </View>
@@ -142,17 +180,16 @@ export default function ProfileScreen() {
           <MenuItem
             icon={<Shield size={18} color={Colors.primary} />}
             label="Vérification du profil"
-            sublabel={profile.verified ? 'Profil vérifié' : 'Compléter la vérification'}
+            sublabel={isVerified ? 'Profil vérifié' : 'Compléter la vérification'}
             onPress={() => console.log('[Profile] Verification tapped')}
-            badge={profile.verified ? '✓' : '!'}
+            badge={isVerified ? '✓' : '!'}
           />
           <View style={styles.menuDivider} />
           <MenuItem
             icon={<FileText size={18} color={Colors.green} />}
             label="Bulletin N°3"
-            sublabel={profile.bulletin3Uploaded ? 'Document envoyé' : 'Requis pour conduire'}
+            sublabel="Requis pour conduire"
             onPress={handleBulletin}
-            badge={profile.bulletin3Uploaded ? '✓' : '!'}
           />
           <View style={styles.menuDivider} />
           <MenuItem
@@ -191,17 +228,16 @@ export default function ProfileScreen() {
           <MenuItem
             icon={<LogOut size={18} color={Colors.danger} />}
             label="Se déconnecter"
-            onPress={() => Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
-              { text: 'Annuler', style: 'cancel' },
-              { text: 'Oui', style: 'destructive' },
-            ])}
+            onPress={handleLogout}
             danger
           />
         </GlassCard>
 
-        <Text style={styles.memberSince}>
-          Membre depuis {profile.memberSince}
-        </Text>
+        {memberSince ? (
+          <Text style={styles.memberSince}>
+            Membre depuis {memberSince}
+          </Text>
+        ) : null}
         <Text style={styles.version}>Faso Auto-stop v1.0</Text>
 
         <View style={{ height: 30 }} />

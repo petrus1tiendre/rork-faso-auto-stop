@@ -13,6 +13,14 @@ interface TripCardProps {
 
 export default React.memo(function TripCard({ trip, onPress }: TripCardProps) {
   const isInterville = trip.type === 'interville';
+  const driverName = trip.profiles?.full_name ?? 'Conducteur';
+  const driverAvatar = trip.profiles?.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face';
+  const driverRating = trip.profiles?.rating ?? 5.0;
+  const driverTrips = trip.profiles?.total_trips ?? 0;
+  const isVerified = trip.profiles?.is_verified ?? false;
+
+  const dateDisplay = trip.trip_date ? trip.trip_date.slice(5) : '';
+  const timeDisplay = trip.trip_time ? trip.trip_time.slice(0, 5) : '';
 
   return (
     <GlassCard
@@ -42,7 +50,7 @@ export default React.memo(function TripCard({ trip, onPress }: TripCardProps) {
           </View>
         </View>
         <View style={styles.priceContainer}>
-          <Text style={styles.priceAmount}>{trip.price.toLocaleString()}</Text>
+          <Text style={styles.priceAmount}>{trip.price_fcfa.toLocaleString()}</Text>
           <Text style={styles.priceCurrency}>FCFA</Text>
         </View>
       </View>
@@ -50,24 +58,24 @@ export default React.memo(function TripCard({ trip, onPress }: TripCardProps) {
       <View style={styles.detailsRow}>
         <View style={styles.detailItem}>
           <Clock size={12} color={Colors.textSecondary} />
-          <Text style={styles.detailText}>{trip.date.slice(5)} · {trip.time}</Text>
+          <Text style={styles.detailText}>{dateDisplay} · {timeDisplay}</Text>
         </View>
         <View style={styles.detailItem}>
           <Users size={12} color={Colors.textSecondary} />
-          <Text style={styles.detailText}>{trip.seatsAvailable} place{trip.seatsAvailable > 1 ? 's' : ''}</Text>
+          <Text style={styles.detailText}>{trip.seats} place{trip.seats > 1 ? 's' : ''}</Text>
         </View>
       </View>
 
       <View style={styles.driverRow}>
-        <Image source={{ uri: trip.driverAvatar }} style={styles.avatar} />
+        <Image source={{ uri: driverAvatar }} style={styles.avatar} />
         <View style={styles.driverInfo}>
           <View style={styles.driverNameRow}>
-            <Text style={styles.driverName}>{trip.driverName}</Text>
-            {trip.verified && <BadgeCheck size={14} color={Colors.primary} />}
+            <Text style={styles.driverName}>{driverName}</Text>
+            {isVerified && <BadgeCheck size={14} color={Colors.primary} />}
           </View>
           <View style={styles.ratingRow}>
             <Star size={11} color={Colors.orange} fill={Colors.orange} />
-            <Text style={styles.ratingText}>{trip.driverRating} · {trip.driverTrips} trajets</Text>
+            <Text style={styles.ratingText}>{driverRating} · {driverTrips} trajets</Text>
           </View>
         </View>
       </View>

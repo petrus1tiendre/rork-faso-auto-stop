@@ -27,15 +27,17 @@ import {
   Coins,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { useMutation } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
+import { supabase } from '@/lib/supabase';
 
 export default function TripDetailsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { trips, isFavorite, toggleFavorite } = useApp();
+  const { trips, isFavorite, toggleFavorite, userId } = useApp();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -58,6 +60,33 @@ export default function TripDetailsScreen() {
     ]).start();
   }, [fadeAnim, slideAnim]);
 
+  const bookMutation = useMutation({
+    mutationFn: async () => {
+      if (!userId || !trip) throw new Error('Non connecté');
+      if (trip.user_id === userId) throw new Error('Vous ne pouvez pas réserver votre propre trajet.');
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert({
+          trip_id: trip.id,
+          passenger_id: userId,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Réservation envoyée !', 'Le conducteur recevra votre demande.');
+    },
+    onError: (error: Error) => {
+      Alert.alert('Erreur', error.message);
+    },
+  });
+
   const handleFavorite = useCallback(() => {
     if (trip) {
       toggleFavorite(trip.id);
@@ -65,17 +94,19 @@ export default function TripDetailsScreen() {
     }
   }, [trip, toggleFavorite]);
 
+  const { mutate: bookMutate } = bookMutation;
+
   const handleContact = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
-      'Contacter le conducteur',
-      'Envoyer un message pour réserver votre place ?',
+      'Réserver ce trajet',
+      'Envoyer une demande de réservation au conducteur ?',
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Envoyer', onPress: () => console.log('[TripDetails] Contact initiated') },
+        { text: 'Réserver', onPress: () => bookMutate() },
       ]
     );
-  }, []);
+  }, [bookMutate]);
 
   const handlePayment = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -104,6 +135,13 @@ export default function TripDetailsScreen() {
   }
 
   const isInterville = trip.type === 'interville';
+  const driverName = trip.profiles?.full_name ?? 'Conducteur';
+  const driverAvatar = trip.profiles?.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face';
+  const driverRating = trip.profiles?.rating ?? 5.0;
+  const driverTrips = trip.profiles?.total_trips ?? 0;
+  const isVerified = trip.profiles?.is_verified ?? false;
+  const dateDisplay = trip.trip_date ? trip.trip_date.slice(5) : '';
+  const timeDisplay = trip.trip_time ? trip.trip_time.slice(0, 5) : '';
 
   return (
     <View style={styles.container}>
@@ -168,17 +206,17 @@ export default function TripDetailsScreen() {
           <View style={styles.infoGrid}>
             <GlassCard style={styles.infoItem}>
               <Clock size={18} color={Colors.primary} />
-              <Text style={styles.infoValue}>{trip.time}</Text>
-              <Text style={styles.infoLabel}>{trip.date.slice(5)}</Text>
+              <Text style={styles.infoValue}>{timeDisplay}</Text>
+              <Text style={styles.infoLabel}>{dateDisplay}</Text>
             </GlassCard>
             <GlassCard style={styles.infoItem}>
               <Users size={18} color={Colors.green} />
-              <Text style={styles.infoValue}>{trip.seatsAvailable}</Text>
-              <Text style={styles.infoLabel}>place{trip.seatsAvailable > 1 ? 's' : ''}</Text>
+              <Text style={styles.infoValue}>{trip.seats}</Text>
+              <Text style={styles.infoLabel}>place{trip.seats > 1 ? 's' : ''}</Text>
             </GlassCard>
             <GlassCard style={styles.infoItem}>
               <Coins size={18} color={Colors.orange} />
-              <Text style={[styles.infoValue, { color: Colors.primary }]}>{trip.price.toLocaleString()}</Text>
+              <Text style={[styles.infoValue, { color: Colors.primary }]}>{trip.price_fcfa.toLocaleString()}</Text>
               <Text style={styles.infoLabel}>FCFA</Text>
             </GlassCard>
           </View>
@@ -189,8 +227,8 @@ export default function TripDetailsScreen() {
             </View>
             <View style={styles.driverRow}>
               <View style={styles.driverAvatarWrap}>
-                <Image source={{ uri: trip.driverAvatar }} style={styles.driverAvatar} />
-                {trip.verified && (
+                <Image source={{ uri: driverAvatar }} style={styles.driverAvatar} />
+                {isVerified && (
                   <View style={styles.verifiedIcon}>
                     <BadgeCheck size={14} color={Colors.primary} />
                   </View>
@@ -198,8 +236,8 @@ export default function TripDetailsScreen() {
               </View>
               <View style={styles.driverInfo}>
                 <View style={styles.driverNameRow}>
-                  <Text style={styles.driverName}>{trip.driverName}</Text>
-                  {trip.verified && (
+                  <Text style={styles.driverName}>{driverName}</Text>
+                  {isVerified && (
                     <View style={styles.verifiedTag}>
                       <Shield size={10} color={Colors.green} />
                       <Text style={styles.verifiedTagText}>Vérifié</Text>
@@ -208,24 +246,28 @@ export default function TripDetailsScreen() {
                 </View>
                 <View style={styles.driverStats}>
                   <Star size={12} color={Colors.orange} fill={Colors.orange} />
-                  <Text style={styles.driverRating}>{trip.driverRating}</Text>
+                  <Text style={styles.driverRating}>{driverRating}</Text>
                   <Text style={styles.driverDot}>·</Text>
                   <Car size={12} color={Colors.textMuted} />
-                  <Text style={styles.driverTrips}>{trip.driverTrips} trajets</Text>
+                  <Text style={styles.driverTrips}>{driverTrips} trajets</Text>
                 </View>
               </View>
             </View>
           </GlassCard>
 
-          {trip.comments ? (
+          {trip.comment ? (
             <GlassCard style={styles.commentsCard}>
               <Text style={styles.commentsTitle}>Commentaires du conducteur</Text>
-              <Text style={styles.commentsText}>{trip.comments}</Text>
+              <Text style={styles.commentsText}>{trip.comment}</Text>
             </GlassCard>
           ) : null}
 
           <View style={styles.actionButtons}>
-            <Pressable onPress={handleContact} style={styles.contactButton}>
+            <Pressable
+              onPress={handleContact}
+              style={[styles.contactButton, bookMutation.isPending && { opacity: 0.7 }]}
+              disabled={bookMutation.isPending}
+            >
               <LinearGradient
                 colors={[Colors.primary, Colors.primaryDark]}
                 start={{ x: 0, y: 0 }}
@@ -233,7 +275,9 @@ export default function TripDetailsScreen() {
                 style={styles.actionGradient}
               >
                 <MessageCircle size={18} color={Colors.white} />
-                <Text style={styles.actionText}>Contacter</Text>
+                <Text style={styles.actionText}>
+                  {bookMutation.isPending ? 'Réservation...' : 'Réserver'}
+                </Text>
               </LinearGradient>
             </Pressable>
             <Pressable onPress={handlePayment} style={styles.paymentButton}>

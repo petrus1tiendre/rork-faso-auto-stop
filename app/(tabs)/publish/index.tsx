@@ -12,18 +12,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-
 import { Car, MapPin, Calendar, Users, Coins, MessageSquare, ArrowLeftRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
-import { Trip, TripType } from '@/types';
-
+import { TripType } from '@/types';
 
 export default function PublishScreen() {
   const insets = useSafeAreaInsets();
-  const { addTrip, profile, isPublishing } = useApp();
+  const { createTripMutation, isPublishing } = useApp();
 
   const [tripType, setTripType] = useState<TripType>('urbain');
   const [departure, setDeparture] = useState<string>('');
@@ -42,39 +40,40 @@ export default function PublishScreen() {
       return;
     }
 
-    const newTrip: Trip = {
-      id: Date.now().toString(),
-      type: tripType,
-      departure: departure.trim(),
-      arrival: arrival.trim(),
-      date: date.trim(),
-      time: time.trim(),
-      seats: parseInt(seats, 10) || 3,
-      seatsAvailable: parseInt(seats, 10) || 3,
-      price: parseInt(price.replace(/\s/g, ''), 10) || 0,
-      driverName: profile.name,
-      driverAvatar: profile.avatar,
-      driverRating: profile.rating,
-      driverTrips: profile.tripsCompleted,
-      verified: profile.verified,
-      comments: comments.trim(),
-      createdAt: new Date().toISOString(),
-    };
+    const priceNum = parseInt(price.replace(/\s/g, ''), 10) || 0;
+    const seatsNum = parseInt(seats, 10) || 3;
 
-    addTrip(newTrip);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Trajet publié !', 'Votre trajet a été envoyé au serveur et sera visible par les passagers.');
-
-    setDeparture('');
-    setArrival('');
-    setDate('');
-    setTime('');
-    setSeats('3');
-    setPrice('');
-    setComments('');
-
-    console.log('[PublishScreen] Trip published via backend');
-  }, [tripType, departure, arrival, date, time, seats, price, comments, addTrip, profile]);
+    createTripMutation.mutate(
+      {
+        type: tripType,
+        departure: departure.trim(),
+        arrival: arrival.trim(),
+        trip_date: date.trim(),
+        trip_time: time.trim(),
+        seats: seatsNum,
+        price_fcfa: priceNum,
+        comment: comments.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert('Trajet publié !', 'Votre trajet est maintenant visible par les passagers.');
+          setDeparture('');
+          setArrival('');
+          setDate('');
+          setTime('');
+          setSeats('3');
+          setPrice('');
+          setComments('');
+          console.log('[PublishScreen] Trip published successfully');
+        },
+        onError: (error: Error) => {
+          Alert.alert('Erreur', error.message || 'Impossible de publier le trajet.');
+          console.log('[PublishScreen] Publish error:', error.message);
+        },
+      }
+    );
+  }, [tripType, departure, arrival, date, time, seats, price, comments, createTripMutation]);
 
   return (
     <View style={styles.container}>
@@ -168,7 +167,7 @@ export default function PublishScreen() {
                 style={styles.input}
                 value={date}
                 onChangeText={setDate}
-                placeholder="2026-03-01"
+                placeholder="2026-03-05"
                 placeholderTextColor={Colors.textMuted}
               />
             </View>

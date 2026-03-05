@@ -26,7 +26,7 @@ type FilterType = 'all' | TripType;
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isOffline, isSyncing, trips, isLoading, refetchTrips } = useApp();
+  const { isOffline, isSyncing, trips, isLoading, refetchTrips, profile } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(() => {
@@ -60,6 +60,8 @@ export default function HomeScreen() {
     router.push({ pathname: '/trip-details', params: { id: tripId } });
   }, [router]);
 
+  const greeting = profile?.full_name ? `Salut ${profile.full_name.split(' ')[0]} !` : 'Salut !';
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -67,7 +69,6 @@ export default function HomeScreen() {
         colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
         style={StyleSheet.absoluteFill}
       />
-
       <LinearGradient
         colors={['rgba(66, 165, 245, 0.15)', 'transparent']}
         style={styles.topGlow}
@@ -89,7 +90,7 @@ export default function HomeScreen() {
         }
       >
         <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
-          <Text style={styles.greeting}>Salut !</Text>
+          <Text style={styles.greeting}>{greeting}</Text>
           <Text style={styles.title}>Faso Auto-stop</Text>
           <Text style={styles.subtitle}>
             Partagez vos trajets, économisez ensemble
@@ -143,11 +144,11 @@ export default function HomeScreen() {
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Chargement depuis le serveur...</Text>
+            <Text style={styles.loadingText}>Chargement des trajets...</Text>
           </View>
         )}
 
-        {filteredTrips.map((trip) => (
+        {!isLoading && filteredTrips.map((trip) => (
           <TripCard
             key={trip.id}
             trip={trip}
@@ -155,11 +156,13 @@ export default function HomeScreen() {
           />
         ))}
 
-        {filteredTrips.length === 0 && (
+        {!isLoading && filteredTrips.length === 0 && (
           <GlassCard style={styles.emptyCard}>
             <Text style={styles.emptyText}>Aucun trajet trouvé</Text>
             <Text style={styles.emptySubtext}>
-              Changez le filtre ou publiez un nouveau trajet
+              {trips.length === 0
+                ? 'Soyez le premier à publier un trajet !'
+                : 'Changez le filtre ou publiez un nouveau trajet'}
             </Text>
           </GlassCard>
         )}

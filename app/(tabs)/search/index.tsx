@@ -8,6 +8,7 @@ import {
   Pressable,
   StatusBar,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,7 +28,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const results = useSearchTrips(query, activeFilter);
-  const { refetchTrips } = useApp();
+  const { refetchTrips, isLoading } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(() => {
@@ -121,7 +122,13 @@ export default function SearchScreen() {
           </View>
         </View>
 
-        {results.map((trip) => (
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        )}
+
+        {!isLoading && results.map((trip) => (
           <TripCard
             key={trip.id}
             trip={trip}
@@ -129,7 +136,7 @@ export default function SearchScreen() {
           />
         ))}
 
-        {results.length === 0 && (
+        {!isLoading && results.length === 0 && (
           <GlassCard style={styles.emptyCard}>
             <Search size={40} color={Colors.textMuted} />
             <Text style={styles.emptyText}>Aucun résultat</Text>
@@ -245,6 +252,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     fontWeight: '500' as const,
+  },
+  loadingContainer: {
+    alignItems: 'center' as const,
+    paddingVertical: 32,
   },
   emptyCard: {
     alignItems: 'center' as const,
