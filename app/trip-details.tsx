@@ -30,7 +30,6 @@ import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
-import { trpc } from '@/lib/trpc';
 
 export default function TripDetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -40,13 +39,7 @@ export default function TripDetailsScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  const tripFromBackend = trpc.trips.getById.useQuery(
-    { id: id ?? '' },
-    { enabled: !!id }
-  );
-
-  const localTrip = trips.find((t) => t.id === id);
-  const trip = tripFromBackend.data ?? localTrip;
+  const trip = trips.find((t) => t.id === id);
   const favorite = trip ? isFavorite(trip.id) : false;
 
   useEffect(() => {

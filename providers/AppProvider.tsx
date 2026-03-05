@@ -1,107 +1,194 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trip, TripType, ChatConversation, UserProfile } from '@/types';
-import { trpc, isBackendConfigured } from '@/lib/trpc';
+import { supabase } from '@/lib/supabase';
 import { mockTrips, mockChats, mockProfile } from '@/mocks/trips';
 
 const FAVORITES_KEY = 'faso_autostop_favorites';
 
+async function fetchTrips(): Promise<Trip[]> {
+  console.log('[AppProvider] Fetching trips from Supabase...');
+  const { data, error } = await supabase
+    .from('trips')
+    .select(`
+      *,
+      users:user_id (name, avatar_url, is_verified, rating)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.log('[AppProvider] Supabase trips error:', error.message);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    console.log('[AppProvider] No trips from Supabase, using mock data');
+    return mockTrips;
+  }
+
+  return data.map((t: any) => ({
+    id: t.id,
+    type: t.type as TripType,
+    departure: t.departure,
+    arrival: t.arrival,
+    date: t.date,
+    time: t.date ? t.date.split('T')[1]?.slice(0, 5) ?? '00:00' : '00:00',
+    seats: t.seats,
+    seatsAvailable: t.seats,
+    price: t.price_fcfa,
+    driverName: t.users?.name ?? 'Conducteur',
+    driverAvatar: t.users?.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face',
+    driverRating: t.users?.rating ?? 4.5,
+    driverTrips: 0,
+    verified: t.users?.is_verified ?? false,
+    comments: t.comment ?? '',
+    createdAt: t.created_at,
+  }));
+}
+
+async function fetchChats(): Promise<ChatConversation[]> {
+  console.log('[AppProvider] Fetching chats from Supabase...');
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    console.log('[AppProvider] No session, using mock chats');
+    return mockChats;
+  }
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      trips:trip_id (departure, arrival, date),
+      messages (content, created_at)
+    `)
+    .or(`passenger_id.eq.${session.user.id}`)
+    .order('created_at', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    console.log('[AppProvider] No chats from Supabase, using mock data');
+    return mockChats;
+  }
+
+  return mockChats;
+}
+
+async function fetchProfile(): Promise<UserProfile> {
+  console.log('[AppProvider] Fetching profile from Supabase...');
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    console.log('[AppProvider] No session, using mock profile');
+    return mockProfile;
+  }
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', session.user.id)
+    .single();
+
+  if (error || !data) {
+    console.log('[AppProvider] No profile from Supabase, using mock data');
+    return mockProfile;
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    phone: data.phone,
+    avatar: data.avatar_url ?? mockProfile.avatar,
+    rating: data.rating,
+    tripsCompleted: 0,
+    verified: data.is_verified,
+    memberSince: new Date(data.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+    bulletin3Uploaded: false,
+  };
+}
 
 export const [AppProvider, useApp] = createContextHook(() => {
-  const backendReady = isBackendConfigured();
+  const queryClient = useQueryClient();
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [isOffline, setIsOffline] = useState<boolean>(!backendReady);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [localTrips, setLocalTrips] = useState<Trip[]>(mockTrips);
 
-  const tripsQuery = trpc.trips.list.useQuery(
-    { type: 'all', query: '' },
-    {
-      enabled: backendReady,
-      refetchOnWindowFocus: true,
-      refetchInterval: 60000,
-      retry: 1,
-    }
-  );
-
-  const chatsQuery = trpc.chats.list.useQuery(undefined, {
-    enabled: backendReady,
-    refetchInterval: 30000,
+  const tripsQuery = useQuery({
+    queryKey: ['trips'],
+    queryFn: fetchTrips,
+    staleTime: 30000,
     retry: 1,
   });
 
-  const profileQuery = trpc.profile.get.useQuery(undefined, {
-    enabled: backendReady,
+  const chatsQuery = useQuery({
+    queryKey: ['chats'],
+    queryFn: fetchChats,
+    staleTime: 30000,
     retry: 1,
   });
 
-  const createTripMutation = trpc.trips.create.useMutation({
+  const profileQuery = useQuery({
+    queryKey: ['profile'],
+    queryFn: fetchProfile,
+    staleTime: 60000,
+    retry: 1,
+  });
+
+  const createTripMutation = useMutation({
+    mutationFn: async (trip: Trip) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id ?? 'anonymous';
+
+      const { data, error } = await supabase
+        .from('trips')
+        .insert({
+          user_id: userId,
+          type: trip.type,
+          departure: trip.departure,
+          arrival: trip.arrival,
+          date: `${trip.date}T${trip.time}:00`,
+          seats: trip.seats,
+          price_fcfa: trip.price,
+          comment: trip.comments || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.log('[AppProvider] Supabase insert trip error:', error.message);
+        throw error;
+      }
+      console.log('[AppProvider] Trip created on Supabase:', data?.id);
+      return data;
+    },
     onSuccess: () => {
-      console.log('[AppProvider] Trip created on backend, refetching...');
-      tripsQuery.refetch();
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
     },
     onError: (error) => {
-      console.log('[AppProvider] Failed to create trip on backend:', error.message);
+      console.log('[AppProvider] Failed to create trip:', error.message);
     },
   });
 
   const trips: Trip[] = useMemo(() => {
-    if (backendReady && tripsQuery.data) {
-      return tripsQuery.data.map((t) => ({
-        id: t.id,
-        type: t.type,
-        departure: t.departure,
-        arrival: t.arrival,
-        date: t.date,
-        time: t.time,
-        seats: t.seats,
-        seatsAvailable: t.seatsAvailable,
-        price: t.price,
-        driverName: t.driverName,
-        driverAvatar: t.driverAvatar,
-        driverRating: t.driverRating,
-        driverTrips: t.driverTrips,
-        verified: t.verified,
-        comments: t.comments,
-        createdAt: t.createdAt,
-      }));
+    if (tripsQuery.data && tripsQuery.data.length > 0) {
+      return tripsQuery.data;
     }
     return localTrips;
-  }, [tripsQuery.data, backendReady, localTrips]);
+  }, [tripsQuery.data, localTrips]);
 
   const chats: ChatConversation[] = useMemo(() => {
-    if (backendReady && chatsQuery.data) {
-      return chatsQuery.data.map((c) => ({
-        id: c.id,
-        tripId: c.tripId,
-        otherUser: c.otherUser,
-        otherAvatar: c.otherAvatar,
-        lastMessage: c.lastMessage,
-        lastMessageTime: c.lastMessageTime,
-        unread: c.unread,
-        tripSummary: c.tripSummary,
-      }));
+    if (chatsQuery.data) {
+      return chatsQuery.data;
     }
     return mockChats;
-  }, [chatsQuery.data, backendReady]);
+  }, [chatsQuery.data]);
 
   const profile: UserProfile = useMemo(() => {
-    if (backendReady && profileQuery.data) {
-      return {
-        id: profileQuery.data.id,
-        name: profileQuery.data.name,
-        phone: profileQuery.data.phone,
-        avatar: profileQuery.data.avatar,
-        rating: profileQuery.data.rating,
-        tripsCompleted: profileQuery.data.tripsCompleted,
-        verified: profileQuery.data.verified,
-        memberSince: profileQuery.data.memberSince,
-        bulletin3Uploaded: profileQuery.data.bulletin3Uploaded,
-      };
+    if (profileQuery.data) {
+      return profileQuery.data;
     }
     return mockProfile;
-  }, [profileQuery.data, backendReady]);
+  }, [profileQuery.data]);
 
   useEffect(() => {
     const loadFavorites = async () => {
@@ -126,29 +213,27 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [tripsQuery.isError, tripsQuery.isSuccess]);
 
-  const addTrip = useCallback((trip: Trip) => {
-    if (backendReady) {
-      console.log('[AppProvider] Creating trip on backend...');
-      createTripMutation.mutate({
-        type: trip.type,
-        departure: trip.departure,
-        arrival: trip.arrival,
-        date: trip.date,
-        time: trip.time,
-        seats: trip.seats,
-        price: trip.price,
-        comments: trip.comments,
-        driverName: trip.driverName,
-        driverAvatar: trip.driverAvatar,
-        driverRating: trip.driverRating,
-        driverTrips: trip.driverTrips,
-        verified: trip.verified,
+  useEffect(() => {
+    const channel = supabase
+      .channel('trips-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, (payload) => {
+        console.log('[AppProvider] Realtime trip change:', payload.eventType);
+        queryClient.invalidateQueries({ queryKey: ['trips'] });
+      })
+      .subscribe((status) => {
+        console.log('[AppProvider] Realtime subscription status:', status);
       });
-    } else {
-      console.log('[AppProvider] Backend not configured, saving trip locally');
-      setLocalTrips(prev => [trip, ...prev]);
-    }
-  }, [createTripMutation, backendReady]);
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  const addTrip = useCallback((trip: Trip) => {
+    console.log('[AppProvider] Creating trip via Supabase...');
+    createTripMutation.mutate(trip);
+    setLocalTrips(prev => [trip, ...prev]);
+  }, [createTripMutation]);
 
   const toggleFavorite = useCallback((tripId: string) => {
     setFavorites(prev => {
@@ -167,13 +252,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, [favorites]);
 
   const refetchTrips = useCallback(() => {
-    if (!backendReady) {
-      console.log('[AppProvider] Backend not configured, skipping refetch');
-      return;
-    }
     setIsSyncing(true);
     tripsQuery.refetch().finally(() => setIsSyncing(false));
-  }, [tripsQuery, backendReady]);
+  }, [tripsQuery]);
 
   return {
     trips,
@@ -187,7 +268,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isFavorite,
     setIsOffline,
     setIsSyncing,
-    isLoading: backendReady ? tripsQuery.isLoading : false,
+    isLoading: tripsQuery.isLoading,
     isPublishing: createTripMutation.isPending,
     refetchTrips,
     refetchChats: chatsQuery.refetch,
