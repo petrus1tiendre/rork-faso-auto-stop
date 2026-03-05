@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,6 +12,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Star,
   BadgeCheck,
@@ -23,11 +25,13 @@ import {
   ChevronRight,
   Car,
   AlertTriangle,
+  Camera,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
+import { supabase } from '@/lib/supabase';
 
 interface MenuItemProps {
   icon: React.ReactNode;
@@ -58,27 +62,71 @@ function MenuItem({ icon, label, sublabel, onPress, danger, badge }: MenuItemPro
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, signOut, session } = useApp();
+  const router = useRouter();
+  const { profile, signOut, session, userTripsCount } = useApp();
+  const { profileLoading, profileError, refetchProfile } = useApp();
+  const [loadTimeout, setLoadTimeout] = useState<boolean>(false);
+  const [tapCount, setTapCount] = useState<number>(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
 
-  const handleSignal = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      'Signalement de sécurité',
-      'Si vous avez un problème de sécurité, veuillez contacter notre équipe immédiatement.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Signaler', style: 'destructive', onPress: () => console.log('[Profile] Safety report initiated') },
-      ]
-    );
-  }, []);
+  useEffect(() => {
+    if (profileLoading) {
+      setLoadTimeout(false);
+      const timer = setTimeout(() => {
+        setLoadTimeout(true);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [profileLoading]);
 
-  const handleBulletin = useCallback(() => {
-    Alert.alert(
-      'Bulletin N°3',
-      'Le bulletin n°3 est un extrait du casier judiciaire obligatoire pour conduire sur Faso Auto-stop.\n\nObtenez-le sur :\necasier-judiciaire.gov.bf',
-      [{ text: 'Compris' }]
-    );
-  }, []);
+  const handlePickAvatar = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const uri = result.assets[0].uri;
+        setLocalAvatar(uri);
+        console.log('[Profile] Avatar picked:', uri);
+
+        if (session?.user?.id) {
+          try {
+            const fileName = `${session.user.id}-${Date.now()}.jpg`;
+            const response = await fetch(uri);
+            const blob = await response.blob();
+
+            const { error: uploadError } = await supabase.storage
+              .from('avatars')
+              .upload(fileName, blob, { upsert: true });
+
+            if (!uploadError) {
+              const { data: publicUrl } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(fileName);
+
+              await supabase.from('profiles')
+                .update({ avatar_url: publicUrl.publicUrl })
+                .eq('id', session.user.id);
+
+              refetchProfile();
+              console.log('[Profile] Avatar uploaded successfully');
+            } else {
+              console.log('[Profile] Avatar upload error:', uploadError.message);
+            }
+          } catch (e) {
+            console.log('[Profile] Avatar upload failed:', e);
+          }
+        }
+      }
+    } catch (e) {
+      console.log('[Profile] Image picker error:', e);
+    }
+  }, [session, refetchProfile]);
 
   const handleLogout = useCallback(() => {
     Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
@@ -94,28 +142,35 @@ export default function ProfileScreen() {
     ]);
   }, [signOut]);
 
-  const displayName = profile?.full_name ?? 'Utilisateur';
+  const handleVersionTap = useCallback(() => {
+    const newCount = tapCount + 1;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(() => setTapCount(0), 2000);
+
+    if (newCount >= 5) {
+      setTapCount(0);
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+      const email = session?.user?.email;
+      if (email === 'hans2tiendrebeogo@gmail.com') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.push('/admin');
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert('Accès refusé', "Vous n'avez pas les droits administrateur.");
+      }
+    } else {
+      setTapCount(newCount);
+    }
+  }, [tapCount, session, router]);
+
+  const displayName = profile?.full_name || 'Compléter mon profil';
   const displayEmail = session?.user?.email ?? '';
-  const displayAvatar = profile?.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face';
+  const displayAvatar = localAvatar ?? profile?.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face';
   const isVerified = profile?.is_verified ?? false;
   const rating = profile?.rating ?? 5.0;
-  const totalTrips = profile?.total_trips ?? 0;
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
     : '';
-
-  const { profileLoading, profileError, refetchProfile } = useApp();
-  const [loadTimeout, setLoadTimeout] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (profileLoading) {
-      setLoadTimeout(false);
-      const timer = setTimeout(() => {
-        setLoadTimeout(true);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [profileLoading]);
 
   if (!profile && session && profileLoading && !loadTimeout) {
     return (
@@ -175,14 +230,17 @@ export default function ProfileScreen() {
       >
         <GlassCard variant="accent" style={styles.profileCard}>
           <View style={styles.profileHeader}>
-            <View style={styles.avatarWrapper}>
+            <Pressable onPress={handlePickAvatar} style={styles.avatarWrapper}>
               <Image source={{ uri: displayAvatar }} style={styles.avatar} />
               {isVerified && (
                 <View style={styles.verifiedBadge}>
                   <BadgeCheck size={16} color={Colors.primary} fill={Colors.white} />
                 </View>
               )}
-            </View>
+              <View style={styles.cameraOverlay}>
+                <Camera size={14} color={Colors.white} />
+              </View>
+            </Pressable>
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{displayName}</Text>
               <Text style={styles.profilePhone}>{displayEmail}</Text>
@@ -190,14 +248,14 @@ export default function ProfileScreen() {
                 <Star size={13} color={Colors.orange} fill={Colors.orange} />
                 <Text style={styles.ratingText}>{rating}</Text>
                 <Text style={styles.ratingDot}>·</Text>
-                <Text style={styles.tripCount}>{totalTrips} trajets</Text>
+                <Text style={styles.tripCount}>{userTripsCount} trajets</Text>
               </View>
             </View>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{totalTrips}</Text>
+              <Text style={styles.statValue}>{userTripsCount}</Text>
               <Text style={styles.statLabel}>Trajets</Text>
             </View>
             <View style={styles.statDivider} />
@@ -220,7 +278,7 @@ export default function ProfileScreen() {
             icon={<Shield size={18} color={Colors.primary} />}
             label="Vérification du profil"
             sublabel={isVerified ? 'Profil vérifié' : 'Compléter la vérification'}
-            onPress={() => console.log('[Profile] Verification tapped')}
+            onPress={() => router.push('/profile-verification')}
             badge={isVerified ? '✓' : '!'}
           />
           <View style={styles.menuDivider} />
@@ -228,14 +286,14 @@ export default function ProfileScreen() {
             icon={<FileText size={18} color={Colors.green} />}
             label="Bulletin N°3"
             sublabel="Requis pour conduire"
-            onPress={handleBulletin}
+            onPress={() => router.push('/bulletin')}
           />
           <View style={styles.menuDivider} />
           <MenuItem
             icon={<Car size={18} color={Colors.orange} />}
             label="Mes trajets publiés"
             sublabel="Gérer vos trajets actifs"
-            onPress={() => console.log('[Profile] My trips tapped')}
+            onPress={() => router.push('/my-trips')}
           />
         </GlassCard>
 
@@ -244,14 +302,14 @@ export default function ProfileScreen() {
             icon={<Bell size={18} color={Colors.primary} />}
             label="Notifications"
             sublabel="Nouveaux matchs et confirmations"
-            onPress={() => console.log('[Profile] Notifications tapped')}
+            onPress={() => router.push('/notifications-settings')}
           />
           <View style={styles.menuDivider} />
           <MenuItem
             icon={<HelpCircle size={18} color={Colors.textSecondary} />}
             label="Aide et support"
             sublabel="FAQ et contact"
-            onPress={() => console.log('[Profile] Help tapped')}
+            onPress={() => router.push('/help')}
           />
         </GlassCard>
 
@@ -260,7 +318,7 @@ export default function ProfileScreen() {
             icon={<AlertTriangle size={18} color={Colors.danger} />}
             label="Signaler un problème"
             sublabel="Sécurité et urgences"
-            onPress={handleSignal}
+            onPress={() => router.push('/report-issue')}
             danger
           />
           <View style={styles.menuDivider} />
@@ -277,7 +335,9 @@ export default function ProfileScreen() {
             Membre depuis {memberSince}
           </Text>
         ) : null}
-        <Text style={styles.version}>Faso Auto-stop v1.0</Text>
+        <Pressable onPress={handleVersionTap}>
+          <Text style={styles.version}>Faso Auto-stop v1.0</Text>
+        </Pressable>
 
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -329,6 +389,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: 12,
     padding: 2,
+  },
+  cameraOverlay: {
+    position: 'absolute' as const,
+    bottom: -2,
+    left: -2,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    padding: 4,
+    borderWidth: 2,
+    borderColor: Colors.white,
   },
   profileInfo: {
     flex: 1,

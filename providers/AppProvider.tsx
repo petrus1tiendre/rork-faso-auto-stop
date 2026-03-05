@@ -2,67 +2,91 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Trip, TripType, Profile } from '@/types';
+import { Trip, TripType, Profile, SortType } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
 const FAVORITES_KEY = 'faso_autostop_favorites';
 
+function applySortToTrips(trips: Trip[], sort: SortType): Trip[] {
+  switch (sort) {
+    case 'price_asc':
+      return [...trips].sort((a, b) => a.price_fcfa - b.price_fcfa);
+    case 'price_desc':
+      return [...trips].sort((a, b) => b.price_fcfa - a.price_fcfa);
+    case 'seats':
+      return [...trips].sort((a, b) => b.seats - a.seats);
+    case 'recent':
+    default:
+      return trips;
+  }
+}
+
 async function fetchTrips(): Promise<Trip[]> {
   console.log('[AppProvider] Fetching trips from Supabase...');
-  const { data, error } = await supabase
-    .from('trips')
-    .select('*, profiles(*)')
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('trips')
+      .select('*, profiles(*)')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.log('[AppProvider] Supabase trips error:', error.message);
-    throw error;
+    if (error) {
+      console.log('[AppProvider] Supabase trips error:', error.message);
+      return [];
+    }
+
+    console.log('[AppProvider] Fetched trips:', data?.length ?? 0);
+    return (data ?? []) as Trip[];
+  } catch (e) {
+    console.log('[AppProvider] Trips fetch exception:', e);
+    return [];
   }
-
-  console.log('[AppProvider] Fetched trips:', data?.length ?? 0);
-  return (data ?? []) as Trip[];
 }
 
 async function fetchProfile(userId: string, userEmail?: string): Promise<Profile | null> {
   console.log('[AppProvider] Fetching profile for:', userId);
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
-  if (error && error.code === 'PGRST116') {
-    console.log('[AppProvider] Profile not found, creating one...');
-    const { data: newProfile, error: upsertError } = await supabase
+  try {
+    const { data, error } = await supabase
       .from('profiles')
-      .upsert({
-        id: userId,
-        full_name: userEmail?.split('@')[0] ?? 'Utilisateur',
-        phone: '',
-        avatar_url: null,
-        is_verified: false,
-        rating: 5.0,
-        total_trips: 0,
-      })
       .select('*')
+      .eq('id', userId)
       .single();
 
-    if (upsertError) {
-      console.log('[AppProvider] Profile upsert error:', upsertError.message);
+    if (error && error.code === 'PGRST116') {
+      console.log('[AppProvider] Profile not found, creating one...');
+      const { data: newProfile, error: upsertError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          full_name: userEmail?.split('@')[0] ?? 'Utilisateur',
+          phone: '',
+          avatar_url: null,
+          is_verified: false,
+          rating: 5.0,
+          total_trips: 0,
+        })
+        .select('*')
+        .single();
+
+      if (upsertError) {
+        console.log('[AppProvider] Profile upsert error:', upsertError.message);
+        return null;
+      }
+      console.log('[AppProvider] Profile created via upsert');
+      return newProfile as Profile;
+    }
+
+    if (error) {
+      console.log('[AppProvider] Profile fetch error:', error.message);
       return null;
     }
-    console.log('[AppProvider] Profile created via upsert');
-    return newProfile as Profile;
-  }
 
-  if (error) {
-    console.log('[AppProvider] Profile fetch error:', error.message);
+    return data as Profile;
+  } catch (e) {
+    console.log('[AppProvider] Profile fetch exception:', e);
     return null;
   }
-
-  return data as Profile;
 }
 
 export const [AppProvider, useApp] = createContextHook(() => {
@@ -86,6 +110,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       if (s) {
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['trips'] });
+        queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
       }
     });
 
@@ -111,6 +136,29 @@ export const [AppProvider, useApp] = createContextHook(() => {
     enabled: !!userId,
     staleTime: 60000,
     retry: 2,
+  });
+
+  const userTripsCountQuery = useQuery({
+    queryKey: ['userTripsCount', userId],
+    queryFn: async () => {
+      if (!userId) return 0;
+      try {
+        const { count, error } = await supabase
+          .from('trips')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId);
+        if (error) {
+          console.log('[AppProvider] User trips count error:', error.message);
+          return 0;
+        }
+        return count ?? 0;
+      } catch (e) {
+        console.log('[AppProvider] User trips count exception:', e);
+        return 0;
+      }
+    },
+    enabled: !!userId,
+    staleTime: 30000,
   });
 
   const createTripMutation = useMutation({
@@ -152,6 +200,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trips'] });
+      queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
     },
   });
 
@@ -169,6 +218,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     return profileQuery.data ?? null;
   }, [profileQuery.data]);
 
+  const userTripsCount = userTripsCountQuery.data ?? 0;
+
   useEffect(() => {
     const loadFavorites = async () => {
       try {
@@ -183,14 +234,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
     loadFavorites();
   }, []);
 
-
-
   useEffect(() => {
     const channel = supabase
       .channel('trips-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, (payload) => {
         console.log('[AppProvider] Realtime trip change:', payload.eventType);
         queryClient.invalidateQueries({ queryKey: ['trips'] });
+        queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
       })
       .subscribe((status) => {
         console.log('[AppProvider] Realtime subscription:', status);
@@ -230,6 +280,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     authLoading,
     trips,
     profile,
+    userTripsCount,
     isSyncing,
     favorites,
     createTripMutation,
@@ -246,15 +297,15 @@ export const [AppProvider, useApp] = createContextHook(() => {
   };
 });
 
-export function useFilteredTrips(filter: TripType | 'all') {
+export function useFilteredTrips(filter: TripType | 'all', sort: SortType = 'recent') {
   const { trips } = useApp();
   return useMemo(() => {
-    if (filter === 'all') return trips;
-    return trips.filter(t => t.type === filter);
-  }, [trips, filter]);
+    let filtered = filter === 'all' ? trips : trips.filter(t => t.type === filter);
+    return applySortToTrips(filtered, sort);
+  }, [trips, filter, sort]);
 }
 
-export function useSearchTrips(query: string, type: TripType | 'all') {
+export function useSearchTrips(query: string, type: TripType | 'all', sort: SortType = 'recent') {
   const { trips } = useApp();
   return useMemo(() => {
     let filtered = trips;
@@ -269,6 +320,6 @@ export function useSearchTrips(query: string, type: TripType | 'all') {
         (t.profiles?.full_name ?? '').toLowerCase().includes(lower)
       );
     }
-    return filtered;
-  }, [trips, query, type]);
+    return applySortToTrips(filtered, sort);
+  }, [trips, query, type, sort]);
 }

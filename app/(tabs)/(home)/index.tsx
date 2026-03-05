@@ -13,12 +13,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { MapPin, Navigation, Zap } from 'lucide-react-native';
+import { MapPin, Navigation, Zap, SlidersHorizontal } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp, useFilteredTrips } from '@/providers/AppProvider';
 import TripCard from '@/components/TripCard';
 import GlassCard from '@/components/GlassCard';
-import { TripType } from '@/types';
+import SortModal from '@/components/SortModal';
+import { TripType, SortType } from '@/types';
 
 type FilterType = 'all' | TripType;
 
@@ -27,14 +28,17 @@ export default function HomeScreen() {
   const router = useRouter();
   const { trips, isLoading, refetchTrips, profile } = useApp();
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [sortType, setSortType] = useState<SortType>('recent');
+  const [showSort, setShowSort] = useState(false);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     refetchTrips();
     setTimeout(() => setRefreshing(false), 1000);
   }, [refetchTrips]);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const filteredTrips = useFilteredTrips(activeFilter);
+
+  const filteredTrips = useFilteredTrips(activeFilter, sortType);
 
   const totalTrips = trips.length;
   const intervilleCount = useMemo(() => trips.filter(t => t.type === 'interville').length, [trips]);
@@ -136,7 +140,13 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Trajets disponibles</Text>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Trajets disponibles</Text>
+          <Pressable onPress={() => setShowSort(true)} style={styles.sortButton}>
+            <SlidersHorizontal size={14} color={Colors.textSecondary} />
+            <Text style={styles.sortText}>Trier</Text>
+          </Pressable>
+        </View>
 
         {isLoading && (
           <View style={styles.loadingContainer}>
@@ -166,6 +176,13 @@ export default function HomeScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      <SortModal
+        visible={showSort}
+        onClose={() => setShowSort(false)}
+        currentSort={sortType}
+        onSelect={setSortType}
+      />
     </View>
   );
 }
@@ -262,11 +279,30 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: Colors.white,
   },
+  sectionRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.text,
-    marginBottom: 12,
+  },
+  sortButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.60)',
+  },
+  sortText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500' as const,
   },
   emptyCard: {
     alignItems: 'center' as const,

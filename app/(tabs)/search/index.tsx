@@ -18,7 +18,8 @@ import Colors from '@/constants/colors';
 import { useSearchTrips, useApp } from '@/providers/AppProvider';
 import TripCard from '@/components/TripCard';
 import GlassCard from '@/components/GlassCard';
-import { TripType } from '@/types';
+import SortModal from '@/components/SortModal';
+import { TripType, SortType } from '@/types';
 
 type FilterType = 'all' | TripType;
 
@@ -27,7 +28,9 @@ export default function SearchScreen() {
   const router = useRouter();
   const [query, setQuery] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const results = useSearchTrips(query, activeFilter);
+  const [sortType, setSortType] = useState<SortType>('recent');
+  const [showSort, setShowSort] = useState(false);
+  const results = useSearchTrips(query, activeFilter, sortType);
   const { refetchTrips, isLoading } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -116,10 +119,10 @@ export default function SearchScreen() {
           <Text style={styles.resultCount}>
             {results.length} trajet{results.length !== 1 ? 's' : ''} trouvé{results.length !== 1 ? 's' : ''}
           </Text>
-          <View style={styles.sortButton}>
+          <Pressable onPress={() => setShowSort(true)} style={styles.sortButton}>
             <SlidersHorizontal size={14} color={Colors.textSecondary} />
             <Text style={styles.sortText}>Trier</Text>
-          </View>
+          </Pressable>
         </View>
 
         {isLoading && (
@@ -148,6 +151,13 @@ export default function SearchScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      <SortModal
+        visible={showSort}
+        onClose={() => setShowSort(false)}
+        currentSort={sortType}
+        onSelect={setSortType}
+      />
     </View>
   );
 }

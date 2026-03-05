@@ -64,13 +64,14 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="register" options={{ headerShown: false, presentation: 'modal' }} />
-        <Stack.Screen
-          name="trip-details"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-          }}
-        />
+        <Stack.Screen name="trip-details" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="profile-verification" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="bulletin" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="my-trips" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="notifications-settings" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="help" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="report-issue" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="admin" options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
     </AuthGate>
   );

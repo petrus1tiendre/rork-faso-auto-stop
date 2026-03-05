@@ -1,5 +1,7 @@
 export type TripType = 'urbain' | 'interville';
 
+export type SortType = 'recent' | 'price_asc' | 'price_desc' | 'seats';
+
 export interface Profile {
   id: string;
   phone: string | null;
