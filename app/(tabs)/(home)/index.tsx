@@ -17,7 +17,6 @@ import { MapPin, Navigation, Zap } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp, useFilteredTrips } from '@/providers/AppProvider';
 import TripCard from '@/components/TripCard';
-import OfflineBanner from '@/components/OfflineBanner';
 import GlassCard from '@/components/GlassCard';
 import { TripType } from '@/types';
 
@@ -26,7 +25,7 @@ type FilterType = 'all' | TripType;
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isOffline, isSyncing, trips, isLoading, refetchTrips, profile } = useApp();
+  const { trips, isLoading, refetchTrips, profile } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(() => {
@@ -73,8 +72,6 @@ export default function HomeScreen() {
         colors={['rgba(66, 165, 245, 0.15)', 'transparent']}
         style={styles.topGlow}
       />
-
-      <OfflineBanner isOffline={isOffline} isSyncing={isSyncing} />
 
       <ScrollView
         style={styles.scroll}

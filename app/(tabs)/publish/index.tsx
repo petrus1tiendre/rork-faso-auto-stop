@@ -9,6 +9,8 @@ import {
   Alert,
   StatusBar,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -87,6 +89,10 @@ export default function PublishScreen() {
         style={styles.topGlow}
       />
 
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
@@ -258,6 +264,7 @@ export default function PublishScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -273,6 +280,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 300,
+  },
+  flex: {
+    flex: 1,
   },
   scroll: {
     flex: 1,

@@ -41,6 +41,7 @@ export default function RegisterScreen() {
         email: email.trim(),
         password: password.trim(),
         options: {
+          emailRedirectTo: undefined,
           data: {
             full_name: fullName.trim(),
           },
@@ -56,7 +57,7 @@ export default function RegisterScreen() {
           .upsert({
             id: data.user.id,
             full_name: fullName.trim(),
-            phone: null,
+            phone: '',
             avatar_url: null,
             is_verified: false,
             rating: 5.0,
@@ -68,20 +69,26 @@ export default function RegisterScreen() {
         } else {
           console.log('[Register] Profile created successfully');
         }
+
+        if (!data.session) {
+          console.log('[Register] No session returned, signing in manually...');
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password: password.trim(),
+          });
+          if (signInError) {
+            console.log('[Register] Manual sign-in error:', signInError.message);
+          } else {
+            console.log('[Register] Manual sign-in success');
+            return signInData;
+          }
+        }
       }
 
       return data;
     },
-    onSuccess: (data) => {
-      if (data.session) {
-        console.log('[Register] Auto-logged in');
-      } else {
-        Alert.alert(
-          'Compte créé',
-          'Vérifiez votre email pour confirmer votre compte, puis connectez-vous.',
-          [{ text: 'OK', onPress: () => router.back() }]
-        );
-      }
+    onSuccess: () => {
+      console.log('[Register] Registration complete, user should be logged in');
     },
     onError: (error: Error) => {
       console.log('[Register] Error:', error.message);

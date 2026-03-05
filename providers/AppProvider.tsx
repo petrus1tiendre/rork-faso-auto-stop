@@ -25,13 +25,37 @@ async function fetchTrips(): Promise<Trip[]> {
   return (data ?? []) as Trip[];
 }
 
-async function fetchProfile(userId: string): Promise<Profile | null> {
+async function fetchProfile(userId: string, userEmail?: string): Promise<Profile | null> {
   console.log('[AppProvider] Fetching profile for:', userId);
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .single();
+
+  if (error && error.code === 'PGRST116') {
+    console.log('[AppProvider] Profile not found, creating one...');
+    const { data: newProfile, error: upsertError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        full_name: userEmail?.split('@')[0] ?? 'Utilisateur',
+        phone: '',
+        avatar_url: null,
+        is_verified: false,
+        rating: 5.0,
+        total_trips: 0,
+      })
+      .select('*')
+      .single();
+
+    if (upsertError) {
+      console.log('[AppProvider] Profile upsert error:', upsertError.message);
+      return null;
+    }
+    console.log('[AppProvider] Profile created via upsert');
+    return newProfile as Profile;
+  }
 
   if (error) {
     console.log('[AppProvider] Profile fetch error:', error.message);
@@ -46,7 +70,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [isOffline, setIsOffline] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   useEffect(() => {
@@ -80,12 +103,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
     retry: 1,
   });
 
+  const userEmail = session?.user?.email ?? undefined;
+
   const profileQuery = useQuery({
-    queryKey: ['profile', userId],
-    queryFn: () => fetchProfile(userId!),
+    queryKey: ['profile', userId, userEmail],
+    queryFn: () => fetchProfile(userId!, userEmail),
     enabled: !!userId,
     staleTime: 60000,
-    retry: 1,
+    retry: 2,
   });
 
   const createTripMutation = useMutation({
@@ -158,13 +183,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     loadFavorites();
   }, []);
 
-  useEffect(() => {
-    if (tripsQuery.isError) {
-      setIsOffline(true);
-    } else if (tripsQuery.isSuccess) {
-      setIsOffline(false);
-    }
-  }, [tripsQuery.isError, tripsQuery.isSuccess]);
+
 
   useEffect(() => {
     const channel = supabase
@@ -211,16 +230,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
     authLoading,
     trips,
     profile,
-    isOffline,
     isSyncing,
     favorites,
     createTripMutation,
     signOut,
     toggleFavorite,
     isFavorite,
-    setIsOffline,
     setIsSyncing,
     isLoading: tripsQuery.isLoading,
+    profileLoading: profileQuery.isLoading,
+    profileError: profileQuery.isError,
     isPublishing: createTripMutation.isPending,
     refetchTrips,
     refetchProfile: profileQuery.refetch,

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -104,7 +104,20 @@ export default function ProfileScreen() {
     ? new Date(profile.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
     : '';
 
-  if (!profile && session) {
+  const { profileLoading, profileError, refetchProfile } = useApp();
+  const [loadTimeout, setLoadTimeout] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (profileLoading) {
+      setLoadTimeout(false);
+      const timer = setTimeout(() => {
+        setLoadTimeout(true);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [profileLoading]);
+
+  if (!profile && session && profileLoading && !loadTimeout) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <LinearGradient
@@ -113,6 +126,32 @@ export default function ProfileScreen() {
         />
         <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={{ color: Colors.textSecondary, marginTop: 12 }}>Chargement du profil...</Text>
+      </View>
+    );
+  }
+
+  if (!profile && session && (loadTimeout || profileError)) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }]}>
+        <LinearGradient
+          colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+          style={StyleSheet.absoluteFill}
+        />
+        <Text style={{ color: Colors.text, fontSize: 16, fontWeight: '600' as const, textAlign: 'center' as const, marginBottom: 8 }}>
+          Impossible de charger le profil
+        </Text>
+        <Text style={{ color: Colors.textSecondary, fontSize: 13, textAlign: 'center' as const, marginBottom: 20 }}>
+          Vérifiez votre connexion et réessayez.
+        </Text>
+        <Pressable
+          onPress={() => {
+            setLoadTimeout(false);
+            refetchProfile();
+          }}
+          style={{ backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+        >
+          <Text style={{ color: Colors.white, fontWeight: '700' as const, fontSize: 14 }}>Réessayer</Text>
+        </Pressable>
       </View>
     );
   }
