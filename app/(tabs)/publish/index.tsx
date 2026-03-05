@@ -84,7 +84,7 @@ export default function PublishScreen() {
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(224, 187, 228, 0.25)', 'transparent']}
+        colors={['rgba(187, 222, 251, 0.25)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -316,11 +316,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.50)',
     borderWidth: 1,
-    borderColor: 'rgba(125, 60, 152, 0.12)',
+    borderColor: 'rgba(33, 150, 243, 0.12)',
     alignItems: 'center' as const,
   },
   typeChipActive: {
-    backgroundColor: 'rgba(125, 60, 152, 0.15)',
+    backgroundColor: 'rgba(33, 150, 243, 0.15)',
     borderColor: Colors.primary,
   },
   typeChipActiveWarm: {
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.60)',
     borderWidth: 1,
-    borderColor: 'rgba(125, 60, 152, 0.12)',
+    borderColor: 'rgba(33, 150, 243, 0.12)',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,

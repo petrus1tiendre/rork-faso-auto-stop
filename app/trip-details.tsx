@@ -117,7 +117,7 @@ export default function TripDetailsScreen() {
       <StatusBar barStyle="dark-content" />
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} style={StyleSheet.absoluteFill} />
       <LinearGradient
-        colors={isInterville ? ['rgba(255, 153, 51, 0.12)', 'transparent'] : ['rgba(167, 139, 250, 0.15)', 'transparent']}
+        colors={isInterville ? ['rgba(255, 153, 51, 0.12)', 'transparent'] : ['rgba(66, 165, 245, 0.15)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 8,
-    backgroundColor: 'rgba(125, 60, 152, 0.12)',
+    backgroundColor: 'rgba(33, 150, 243, 0.12)',
   },
   typeBadgeWarm: {
     backgroundColor: 'rgba(255, 153, 51, 0.12)',
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   routeLineVertical: {
     width: 2,
     flex: 1,
-    backgroundColor: 'rgba(125, 60, 152, 0.15)',
+    backgroundColor: 'rgba(33, 150, 243, 0.15)',
     marginVertical: 4,
   },
   routeDetails: {
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     borderWidth: 2,
-    borderColor: 'rgba(167, 139, 250, 0.35)',
+    borderColor: 'rgba(66, 165, 245, 0.35)',
   },
   verifiedIcon: {
     position: 'absolute' as const,
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: 'rgba(125, 60, 152, 0.12)',
+    backgroundColor: 'rgba(33, 150, 243, 0.12)',
   },
   backLinkText: {
     fontSize: 14,

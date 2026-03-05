@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: 'rgba(125, 60, 152, 0.12)',
+    backgroundColor: 'rgba(33, 150, 243, 0.12)',
     marginBottom: 10,
   },
   typeText: {
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   routeLine: {
     height: 1,
     flex: 1,
-    backgroundColor: 'rgba(125, 60, 152, 0.10)',
+    backgroundColor: 'rgba(33, 150, 243, 0.10)',
     marginLeft: 4,
   },
   priceContainer: {
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(125, 60, 152, 0.08)',
+    borderBottomColor: 'rgba(33, 150, 243, 0.08)',
   },
   detailItem: {
     flexDirection: 'row' as const,
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.35)',
+    borderColor: 'rgba(66, 165, 245, 0.35)',
   },
   driverInfo: {
     flex: 1,

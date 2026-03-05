@@ -87,7 +87,7 @@ export default function ProfileScreen() {
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(167, 139, 250, 0.15)', 'transparent']}
+        colors={['rgba(66, 165, 245, 0.15)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     borderWidth: 2,
-    borderColor: 'rgba(167, 139, 250, 0.40)',
+    borderColor: 'rgba(66, 165, 245, 0.40)',
   },
   verifiedBadge: {
     position: 'absolute' as const,
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(125, 60, 152, 0.08)',
+    borderTopColor: 'rgba(33, 150, 243, 0.08)',
   },
   statItem: {
     alignItems: 'center' as const,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: 'rgba(125, 60, 152, 0.08)',
+    backgroundColor: 'rgba(33, 150, 243, 0.08)',
   },
   menuSection: {
     marginBottom: 14,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(125, 60, 152, 0.08)',
+    backgroundColor: 'rgba(33, 150, 243, 0.08)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    backgroundColor: 'rgba(125, 60, 152, 0.12)',
+    backgroundColor: 'rgba(33, 150, 243, 0.12)',
   },
   menuBadgeText: {
     fontSize: 11,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   },
   menuDivider: {
     height: 1,
-    backgroundColor: 'rgba(125, 60, 152, 0.06)',
+    backgroundColor: 'rgba(33, 150, 243, 0.06)',
     marginLeft: 64,
   },
   memberSince: {

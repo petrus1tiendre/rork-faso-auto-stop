@@ -34,18 +34,18 @@ export default React.memo(function GlassCard({ children, style, onPress, variant
   const gradientColors = React.useMemo((): [string, string, string] => {
     switch (variant) {
       case 'accent':
-        return ['rgba(167, 139, 250, 0.18)', 'rgba(255, 255, 255, 0.82)', 'rgba(224, 187, 228, 0.12)'];
+        return ['rgba(66, 165, 245, 0.18)', 'rgba(255, 255, 255, 0.82)', 'rgba(187, 222, 251, 0.12)'];
       case 'warm':
         return ['rgba(255, 153, 51, 0.10)', 'rgba(255, 255, 255, 0.82)', 'rgba(255, 220, 180, 0.08)'];
       default:
-        return ['rgba(255, 255, 255, 0.85)', 'rgba(255, 255, 255, 0.78)', 'rgba(248, 244, 251, 0.70)'];
+        return ['rgba(255, 255, 255, 0.85)', 'rgba(255, 255, 255, 0.78)', 'rgba(245, 250, 255, 0.70)'];
     }
   }, [variant]);
 
   const borderColor = React.useMemo(() => {
     switch (variant) {
       case 'accent':
-        return 'rgba(167, 139, 250, 0.30)';
+        return 'rgba(66, 165, 245, 0.30)';
       case 'warm':
         return 'rgba(255, 153, 51, 0.25)';
       default:
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     padding: 16,
     ...Platform.select({
       ios: {
-        shadowColor: 'rgba(125, 60, 152, 0.15)',
+        shadowColor: 'rgba(33, 150, 243, 0.15)',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 1,
         shadowRadius: 24,
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
         elevation: 6,
       },
       web: {
-        shadowColor: 'rgba(125, 60, 152, 0.15)',
+        shadowColor: 'rgba(33, 150, 243, 0.15)',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 1,
         shadowRadius: 24,

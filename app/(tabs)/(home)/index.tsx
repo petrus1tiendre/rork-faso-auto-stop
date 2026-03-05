@@ -69,7 +69,7 @@ export default function HomeScreen() {
       />
 
       <LinearGradient
-        colors={['rgba(167, 139, 250, 0.15)', 'transparent']}
+        colors={['rgba(66, 165, 245, 0.15)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 30,
-    backgroundColor: 'rgba(125, 60, 152, 0.10)',
+    backgroundColor: 'rgba(33, 150, 243, 0.10)',
   },
   filterRow: {
     flexDirection: 'row' as const,
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
-    borderColor: 'rgba(125, 60, 152, 0.12)',
+    borderColor: 'rgba(33, 150, 243, 0.12)',
   },
   filterChipActive: {
     backgroundColor: Colors.primary,

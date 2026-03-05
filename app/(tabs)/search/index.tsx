@@ -54,7 +54,7 @@ export default function SearchScreen() {
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(167, 139, 250, 0.12)', 'transparent']}
+        colors={['rgba(66, 165, 245, 0.12)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     backgroundColor: 'rgba(255, 255, 255, 0.70)',
     borderWidth: 1,
-    borderColor: 'rgba(125, 60, 152, 0.12)',
+    borderColor: 'rgba(33, 150, 243, 0.12)',
     borderRadius: 14,
     paddingHorizontal: 14,
     gap: 10,
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
-    borderColor: 'rgba(125, 60, 152, 0.12)',
+    borderColor: 'rgba(33, 150, 243, 0.12)',
   },
   filterChipActive: {
     backgroundColor: Colors.primary,

@@ -33,7 +33,7 @@ export default function ChatScreen() {
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(167, 139, 250, 0.10)', 'transparent']}
+        colors={['rgba(66, 165, 245, 0.10)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 2,
-    borderColor: 'rgba(167, 139, 250, 0.25)',
+    borderColor: 'rgba(66, 165, 245, 0.25)',
   },
   unreadBadge: {
     position: 'absolute' as const,
