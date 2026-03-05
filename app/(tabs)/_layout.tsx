@@ -51,7 +51,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
           tabBarBadge: 2,
           tabBarBadgeStyle: {
-            backgroundColor: Colors.accent,
+            backgroundColor: Colors.primary,
             color: Colors.white,
             fontSize: 10,
           },

@@ -60,7 +60,7 @@ export default React.memo(function OfflineBanner({ isOffline, isSyncing }: Offli
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    backgroundColor: 'rgba(125, 60, 152, 0.88)',
     paddingVertical: 6,
     paddingHorizontal: 16,
   },

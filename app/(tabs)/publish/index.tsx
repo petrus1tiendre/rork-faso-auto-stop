@@ -78,13 +78,13 @@ export default function PublishScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <LinearGradient
-        colors={['#0A0E1A', '#0D1525', '#0A0E1A']}
+        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(255, 153, 51, 0.06)', 'transparent']}
+        colors={['rgba(224, 187, 228, 0.25)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -217,7 +217,7 @@ export default function PublishScreen() {
           </View>
 
           <View style={styles.suggestRow}>
-            <Coins size={12} color={Colors.accent} />
+            <Coins size={12} color={Colors.orange} />
             <Text style={styles.suggestText}>
               Contribution suggérée : {suggestedPrice} FCFA/personne
             </Text>
@@ -314,18 +314,18 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.50)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(125, 60, 152, 0.12)',
     alignItems: 'center' as const,
   },
   typeChipActive: {
-    backgroundColor: 'rgba(0, 191, 255, 0.2)',
+    backgroundColor: 'rgba(125, 60, 152, 0.15)',
     borderColor: Colors.primary,
   },
   typeChipActiveWarm: {
-    backgroundColor: 'rgba(255, 153, 51, 0.2)',
-    borderColor: Colors.accent,
+    backgroundColor: 'rgba(255, 153, 51, 0.15)',
+    borderColor: Colors.orange,
   },
   typeChipText: {
     fontSize: 13,
@@ -333,7 +333,8 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   typeChipTextActive: {
-    color: Colors.white,
+    color: Colors.text,
+    fontWeight: '700' as const,
   },
   inputGroup: {
     marginBottom: 10,
@@ -347,9 +348,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.60)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderColor: 'rgba(125, 60, 152, 0.12)',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -377,7 +378,7 @@ const styles = StyleSheet.create({
   },
   suggestText: {
     fontSize: 12,
-    color: Colors.accent,
+    color: Colors.orange,
     fontWeight: '500' as const,
   },
   publishButton: {

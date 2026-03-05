@@ -37,7 +37,7 @@ export default React.memo(function TripCard({ trip, onPress }: TripCardProps) {
             <View style={styles.routeLine} />
           </View>
           <View style={styles.locationRow}>
-            <MapPin size={14} color={isInterville ? Colors.accent : Colors.green} />
+            <MapPin size={14} color={isInterville ? Colors.orange : Colors.green} />
             <Text style={styles.locationText} numberOfLines={1}>{trip.arrival}</Text>
           </View>
         </View>
@@ -66,7 +66,7 @@ export default React.memo(function TripCard({ trip, onPress }: TripCardProps) {
             {trip.verified && <BadgeCheck size={14} color={Colors.primary} />}
           </View>
           <View style={styles.ratingRow}>
-            <Star size={11} color={Colors.accent} fill={Colors.accent} />
+            <Star size={11} color={Colors.orange} fill={Colors.orange} />
             <Text style={styles.ratingText}>{trip.driverRating} · {trip.driverTrips} trajets</Text>
           </View>
         </View>
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: 'rgba(0, 191, 255, 0.15)',
+    backgroundColor: 'rgba(125, 60, 152, 0.12)',
     marginBottom: 10,
   },
   typeText: {
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   typeTextWarm: {
-    color: Colors.accent,
+    color: Colors.orange,
   },
   routeRow: {
     flexDirection: 'row' as const,
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   routeLine: {
     height: 1,
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(125, 60, 152, 0.10)',
     marginLeft: 4,
   },
   priceContainer: {
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   priceAmount: {
     fontSize: 20,
     fontWeight: '800' as const,
-    color: Colors.accent,
+    color: Colors.primary,
   },
   priceCurrency: {
     fontSize: 10,
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderBottomColor: 'rgba(125, 60, 152, 0.08)',
   },
   detailItem: {
     flexDirection: 'row' as const,
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(0, 191, 255, 0.3)',
+    borderColor: 'rgba(167, 139, 250, 0.35)',
   },
   driverInfo: {
     flex: 1,

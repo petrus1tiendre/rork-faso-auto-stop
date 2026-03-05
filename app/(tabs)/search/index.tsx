@@ -37,9 +37,9 @@ export default function SearchScreen() {
   }, [refetchTrips]);
 
   const filters: { key: FilterType; label: string; icon: React.ReactNode }[] = [
-    { key: 'all', label: 'Tous', icon: <Zap size={13} color={activeFilter === 'all' ? Colors.background : Colors.textSecondary} /> },
-    { key: 'urbain', label: 'Urbain', icon: <MapPin size={13} color={activeFilter === 'urbain' ? Colors.background : Colors.textSecondary} /> },
-    { key: 'interville', label: 'Interville', icon: <Navigation size={13} color={activeFilter === 'interville' ? Colors.background : Colors.textSecondary} /> },
+    { key: 'all', label: 'Tous', icon: <Zap size={13} color={activeFilter === 'all' ? Colors.white : Colors.textSecondary} /> },
+    { key: 'urbain', label: 'Urbain', icon: <MapPin size={13} color={activeFilter === 'urbain' ? Colors.white : Colors.textSecondary} /> },
+    { key: 'interville', label: 'Interville', icon: <Navigation size={13} color={activeFilter === 'interville' ? Colors.white : Colors.textSecondary} /> },
   ];
 
   const handleTripPress = useCallback((tripId: string) => {
@@ -48,13 +48,13 @@ export default function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <LinearGradient
-        colors={['#0A0E1A', '#0D1525', '#0A0E1A']}
+        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(0, 168, 107, 0.06)', 'transparent']}
+        colors={['rgba(167, 139, 250, 0.12)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -180,9 +180,9 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.70)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderColor: 'rgba(125, 60, 152, 0.12)',
     borderRadius: 14,
     paddingHorizontal: 14,
     gap: 10,
@@ -205,13 +205,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(125, 60, 152, 0.12)',
   },
   filterChipActive: {
-    backgroundColor: Colors.green,
-    borderColor: Colors.green,
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   filterText: {
     fontSize: 12,
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   filterTextActive: {
-    color: Colors.background,
+    color: Colors.white,
   },
   resultHeader: {
     flexDirection: 'row' as const,
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.60)',
   },
   sortText: {
     fontSize: 12,

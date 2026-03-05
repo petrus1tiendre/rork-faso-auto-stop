@@ -51,9 +51,9 @@ export default function HomeScreen() {
   }, [headerOpacity]);
 
   const filters: { key: FilterType; label: string; icon: React.ReactNode }[] = [
-    { key: 'all', label: 'Tous', icon: <Zap size={14} color={activeFilter === 'all' ? Colors.background : Colors.textSecondary} /> },
-    { key: 'urbain', label: 'Urbain Ouaga', icon: <MapPin size={14} color={activeFilter === 'urbain' ? Colors.background : Colors.textSecondary} /> },
-    { key: 'interville', label: 'Ouaga ↔ Bobo', icon: <Navigation size={14} color={activeFilter === 'interville' ? Colors.background : Colors.textSecondary} /> },
+    { key: 'all', label: 'Tous', icon: <Zap size={14} color={activeFilter === 'all' ? Colors.white : Colors.textSecondary} /> },
+    { key: 'urbain', label: 'Urbain Ouaga', icon: <MapPin size={14} color={activeFilter === 'urbain' ? Colors.white : Colors.textSecondary} /> },
+    { key: 'interville', label: 'Ouaga ↔ Bobo', icon: <Navigation size={14} color={activeFilter === 'interville' ? Colors.white : Colors.textSecondary} /> },
   ];
 
   const handleTripPress = useCallback((tripId: string) => {
@@ -62,14 +62,14 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <LinearGradient
-        colors={['#0A0E1A', '#0D1525', '#0A0E1A']}
+        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
         style={StyleSheet.absoluteFill}
       />
 
       <LinearGradient
-        colors={['rgba(0, 191, 255, 0.06)', 'transparent']}
+        colors={['rgba(167, 139, 250, 0.15)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -104,7 +104,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: Colors.accent }]}>{intervilleCount}</Text>
+              <Text style={[styles.statNumber, { color: Colors.orange }]}>{intervilleCount}</Text>
               <Text style={styles.statLabel}>Interville</Text>
             </View>
             <View style={styles.statDivider} />
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(125, 60, 152, 0.10)',
   },
   filterRow: {
     flexDirection: 'row' as const,
@@ -246,9 +246,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(125, 60, 152, 0.12)',
   },
   filterChipActive: {
     backgroundColor: Colors.primary,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   filterTextActive: {
-    color: Colors.background,
+    color: Colors.white,
   },
   sectionTitle: {
     fontSize: 18,

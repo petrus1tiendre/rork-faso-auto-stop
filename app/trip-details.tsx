@@ -99,7 +99,7 @@ export default function TripDetailsScreen() {
   if (!trip) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <LinearGradient colors={['#0A0E1A', '#0D1525', '#0A0E1A']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} style={StyleSheet.absoluteFill} />
         <GlassCard style={styles.errorCard}>
           <Text style={styles.errorText}>Trajet introuvable</Text>
           <Pressable onPress={() => router.back()} style={styles.backLink}>
@@ -114,10 +114,10 @@ export default function TripDetailsScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#0A0E1A', '#0D1525', '#0A0E1A']} style={StyleSheet.absoluteFill} />
+      <StatusBar barStyle="dark-content" />
+      <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} style={StyleSheet.absoluteFill} />
       <LinearGradient
-        colors={isInterville ? ['rgba(255, 153, 51, 0.08)', 'transparent'] : ['rgba(0, 191, 255, 0.08)', 'transparent']}
+        colors={isInterville ? ['rgba(255, 153, 51, 0.12)', 'transparent'] : ['rgba(167, 139, 250, 0.15)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -156,7 +156,7 @@ export default function TripDetailsScreen() {
                 </View>
                 <View style={styles.routeLineVertical} />
                 <View style={styles.routeDot}>
-                  <View style={[styles.dot, { backgroundColor: isInterville ? Colors.accent : Colors.green }]} />
+                  <View style={[styles.dot, { backgroundColor: isInterville ? Colors.orange : Colors.green }]} />
                 </View>
               </View>
               <View style={styles.routeDetails}>
@@ -184,8 +184,8 @@ export default function TripDetailsScreen() {
               <Text style={styles.infoLabel}>place{trip.seatsAvailable > 1 ? 's' : ''}</Text>
             </GlassCard>
             <GlassCard style={styles.infoItem}>
-              <Coins size={18} color={Colors.accent} />
-              <Text style={[styles.infoValue, { color: Colors.accent }]}>{trip.price.toLocaleString()}</Text>
+              <Coins size={18} color={Colors.orange} />
+              <Text style={[styles.infoValue, { color: Colors.primary }]}>{trip.price.toLocaleString()}</Text>
               <Text style={styles.infoLabel}>FCFA</Text>
             </GlassCard>
           </View>
@@ -214,7 +214,7 @@ export default function TripDetailsScreen() {
                   )}
                 </View>
                 <View style={styles.driverStats}>
-                  <Star size={12} color={Colors.accent} fill={Colors.accent} />
+                  <Star size={12} color={Colors.orange} fill={Colors.orange} />
                   <Text style={styles.driverRating}>{trip.driverRating}</Text>
                   <Text style={styles.driverDot}>·</Text>
                   <Car size={12} color={Colors.textMuted} />
@@ -245,7 +245,7 @@ export default function TripDetailsScreen() {
             </Pressable>
             <Pressable onPress={handlePayment} style={styles.paymentButton}>
               <LinearGradient
-                colors={[Colors.accent, Colors.accentDark]}
+                colors={['#FF9933', '#E68A2E']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.actionGradient}
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
@@ -312,10 +312,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 8,
-    backgroundColor: 'rgba(0, 191, 255, 0.15)',
+    backgroundColor: 'rgba(125, 60, 152, 0.12)',
   },
   typeBadgeWarm: {
-    backgroundColor: 'rgba(255, 153, 51, 0.15)',
+    backgroundColor: 'rgba(255, 153, 51, 0.12)',
   },
   typeBadgeText: {
     fontSize: 11,
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   typeBadgeTextWarm: {
-    color: Colors.accent,
+    color: Colors.orange,
   },
   routeCard: {
     marginBottom: 14,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   routeLineVertical: {
     width: 2,
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(125, 60, 152, 0.15)',
     marginVertical: 4,
   },
   routeDetails: {
@@ -417,13 +417,13 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     borderWidth: 2,
-    borderColor: 'rgba(0, 191, 255, 0.3)',
+    borderColor: 'rgba(167, 139, 250, 0.35)',
   },
   verifiedIcon: {
     position: 'absolute' as const,
     bottom: -2,
     right: -2,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.white,
     borderRadius: 10,
     padding: 2,
   },
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: 'rgba(0, 168, 107, 0.15)',
+    backgroundColor: 'rgba(0, 168, 107, 0.12)',
   },
   verifiedTagText: {
     fontSize: 10,
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
   driverRating: {
     fontSize: 13,
     fontWeight: '700' as const,
-    color: Colors.accent,
+    color: Colors.orange,
   },
   driverDot: {
     fontSize: 13,
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: 'rgba(0, 191, 255, 0.15)',
+    backgroundColor: 'rgba(125, 60, 152, 0.12)',
   },
   backLinkText: {
     fontSize: 14,

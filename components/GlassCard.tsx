@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ViewStyle, Pressable, Animated } from 'react-native';
+import { StyleSheet, View, ViewStyle, Pressable, Animated, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 
@@ -15,10 +15,10 @@ export default React.memo(function GlassCard({ children, style, onPress, variant
 
   const handlePressIn = React.useCallback(() => {
     Animated.spring(scaleAnim, {
-      toValue: 0.97,
+      toValue: 0.975,
       useNativeDriver: true,
       speed: 50,
-      bounciness: 4,
+      bounciness: 6,
     }).start();
   }, [scaleAnim]);
 
@@ -27,27 +27,27 @@ export default React.memo(function GlassCard({ children, style, onPress, variant
       toValue: 1,
       useNativeDriver: true,
       speed: 50,
-      bounciness: 4,
+      bounciness: 6,
     }).start();
   }, [scaleAnim]);
 
-  const gradientColors = React.useMemo((): [string, string] => {
+  const gradientColors = React.useMemo((): [string, string, string] => {
     switch (variant) {
       case 'accent':
-        return ['rgba(0, 191, 255, 0.12)', 'rgba(0, 191, 255, 0.04)'];
+        return ['rgba(167, 139, 250, 0.18)', 'rgba(255, 255, 255, 0.82)', 'rgba(224, 187, 228, 0.12)'];
       case 'warm':
-        return ['rgba(255, 153, 51, 0.10)', 'rgba(255, 153, 51, 0.03)'];
+        return ['rgba(255, 153, 51, 0.10)', 'rgba(255, 255, 255, 0.82)', 'rgba(255, 220, 180, 0.08)'];
       default:
-        return ['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.02)'];
+        return ['rgba(255, 255, 255, 0.85)', 'rgba(255, 255, 255, 0.78)', 'rgba(248, 244, 251, 0.70)'];
     }
   }, [variant]);
 
   const borderColor = React.useMemo(() => {
     switch (variant) {
       case 'accent':
-        return 'rgba(0, 191, 255, 0.20)';
+        return 'rgba(167, 139, 250, 0.30)';
       case 'warm':
-        return 'rgba(255, 153, 51, 0.18)';
+        return 'rgba(255, 153, 51, 0.25)';
       default:
         return Colors.glassBorder;
     }
@@ -63,6 +63,7 @@ export default React.memo(function GlassCard({ children, style, onPress, variant
           style={StyleSheet.absoluteFill}
         />
         <View style={styles.highlight} />
+        <View style={styles.innerGlow} />
         {children}
       </View>
     </Animated.View>
@@ -85,6 +86,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(125, 60, 152, 0.15)',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 1,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        shadowColor: 'rgba(125, 60, 152, 0.15)',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 1,
+        shadowRadius: 24,
+      },
+    }),
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
   },
   highlight: {
     position: 'absolute' as const,
@@ -92,6 +111,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
+  },
+  innerGlow: {
+    position: 'absolute' as const,
+    top: 1,
+    left: 0,
+    right: 0,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
 });

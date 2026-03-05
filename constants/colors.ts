@@ -1,24 +1,29 @@
 const Colors = {
-  primary: '#00BFFF',
-  primaryDark: '#0099CC',
-  primaryLight: '#33CCFF',
-  accent: '#FF9933',
-  accentDark: '#E68A2E',
+  primary: '#7D3C98',
+  primaryDark: '#6C3483',
+  primaryLight: '#A78BFA',
+  accent: '#E0BBE4',
+  accentDark: '#C99BD0',
   green: '#00A86B',
   greenDark: '#008F5B',
+  orange: '#FF9933',
 
-  background: '#0A0E1A',
-  backgroundLight: '#111827',
-  surface: '#1A1F2E',
-  surfaceLight: '#252B3B',
+  background: '#EDE4F3',
+  backgroundLight: '#F3ECF8',
+  surface: '#F8F4FB',
+  surfaceLight: '#FFFFFF',
 
-  glass: 'rgba(255, 255, 255, 0.06)',
-  glassBorder: 'rgba(255, 255, 255, 0.12)',
-  glassHighlight: 'rgba(255, 255, 255, 0.15)',
+  backgroundDark: '#2D1B47',
+  surfaceDark: '#3D2460',
 
-  text: '#FFFFFF',
-  textSecondary: '#A0AEC0',
-  textMuted: '#6B7280',
+  glass: 'rgba(255, 255, 255, 0.75)',
+  glassBorder: 'rgba(255, 255, 255, 0.55)',
+  glassHighlight: 'rgba(255, 255, 255, 0.85)',
+  glassShadow: 'rgba(125, 60, 152, 0.08)',
+
+  text: '#1A1A2E',
+  textSecondary: '#5C5470',
+  textMuted: '#8E8A9D',
 
   danger: '#EF4444',
   warning: '#F59E0B',
@@ -27,11 +32,15 @@ const Colors = {
   white: '#FFFFFF',
   black: '#000000',
 
-  tabBar: 'rgba(10, 14, 26, 0.95)',
-  tabBarBorder: 'rgba(0, 191, 255, 0.15)',
+  tabBar: 'rgba(255, 255, 255, 0.92)',
+  tabBarBorder: 'rgba(125, 60, 152, 0.12)',
 
-  cardGradientStart: 'rgba(0, 191, 255, 0.08)',
-  cardGradientEnd: 'rgba(0, 168, 107, 0.04)',
+  cardGradientStart: 'rgba(167, 139, 250, 0.12)',
+  cardGradientEnd: 'rgba(224, 187, 228, 0.08)',
+
+  gradientStart: '#C4A8E0',
+  gradientMid: '#D7C4ED',
+  gradientEnd: '#EDE4F3',
 };
 
 export default Colors;

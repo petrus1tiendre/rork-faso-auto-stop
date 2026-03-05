@@ -27,13 +27,13 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <LinearGradient
-        colors={['#0A0E1A', '#0D1525', '#0A0E1A']}
+        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(0, 191, 255, 0.05)', 'transparent']}
+        colors={['rgba(167, 139, 250, 0.10)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -47,7 +47,7 @@ export default function ChatScreen() {
 
         <GlassCard variant="warm" style={styles.paymentBanner}>
           <View style={styles.paymentRow}>
-            <Phone size={18} color={Colors.accent} />
+            <Phone size={18} color={Colors.orange} />
             <View style={styles.paymentInfo}>
               <Text style={styles.paymentTitle}>Paiement Orange Money / MoMo</Text>
               <Text style={styles.paymentSubtext}>
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   paymentTitle: {
     fontSize: 13,
     fontWeight: '700' as const,
-    color: Colors.accent,
+    color: Colors.orange,
   },
   paymentSubtext: {
     fontSize: 11,
@@ -173,20 +173,20 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 2,
-    borderColor: 'rgba(0, 191, 255, 0.2)',
+    borderColor: 'rgba(167, 139, 250, 0.25)',
   },
   unreadBadge: {
     position: 'absolute' as const,
     top: -2,
     right: -2,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     width: 18,
     height: 18,
     borderRadius: 9,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     borderWidth: 2,
-    borderColor: Colors.background,
+    borderColor: Colors.white,
   },
   unreadText: {
     fontSize: 10,

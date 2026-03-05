@@ -81,13 +81,13 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <LinearGradient
-        colors={['#0A0E1A', '#0D1525', '#0A0E1A']}
+        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(0, 191, 255, 0.08)', 'transparent']}
+        colors={['rgba(167, 139, 250, 0.15)', 'transparent']}
         style={styles.topGlow}
       />
 
@@ -102,7 +102,7 @@ export default function ProfileScreen() {
               <Image source={{ uri: profile.avatar }} style={styles.avatar} />
               {profile.verified && (
                 <View style={styles.verifiedBadge}>
-                  <BadgeCheck size={16} color={Colors.primary} fill={Colors.background} />
+                  <BadgeCheck size={16} color={Colors.primary} fill={Colors.white} />
                 </View>
               )}
             </View>
@@ -110,7 +110,7 @@ export default function ProfileScreen() {
               <Text style={styles.profileName}>{profile.name}</Text>
               <Text style={styles.profilePhone}>{profile.phone}</Text>
               <View style={styles.ratingRow}>
-                <Star size={13} color={Colors.accent} fill={Colors.accent} />
+                <Star size={13} color={Colors.orange} fill={Colors.orange} />
                 <Text style={styles.ratingText}>{profile.rating}</Text>
                 <Text style={styles.ratingDot}>·</Text>
                 <Text style={styles.tripCount}>{profile.tripsCompleted} trajets</Text>
@@ -125,7 +125,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: Colors.accent }]}>{profile.rating}</Text>
+              <Text style={[styles.statValue, { color: Colors.orange }]}>{profile.rating}</Text>
               <Text style={styles.statLabel}>Note</Text>
             </View>
             <View style={styles.statDivider} />
@@ -156,7 +156,7 @@ export default function ProfileScreen() {
           />
           <View style={styles.menuDivider} />
           <MenuItem
-            icon={<Car size={18} color={Colors.accent} />}
+            icon={<Car size={18} color={Colors.orange} />}
             label="Mes trajets publiés"
             sublabel="Gérer vos trajets actifs"
             onPress={() => console.log('[Profile] My trips tapped')}
@@ -245,13 +245,13 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     borderWidth: 2,
-    borderColor: 'rgba(0, 191, 255, 0.4)',
+    borderColor: 'rgba(167, 139, 250, 0.40)',
   },
   verifiedBadge: {
     position: 'absolute' as const,
     bottom: -2,
     right: -2,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.white,
     borderRadius: 12,
     padding: 2,
   },
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: 13,
     fontWeight: '700' as const,
-    color: Colors.accent,
+    color: Colors.orange,
   },
   ratingDot: {
     fontSize: 13,
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: 'rgba(125, 60, 152, 0.08)',
   },
   statItem: {
     alignItems: 'center' as const,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(125, 60, 152, 0.08)',
   },
   menuSection: {
     marginBottom: 14,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(125, 60, 152, 0.08)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    backgroundColor: 'rgba(0, 191, 255, 0.15)',
+    backgroundColor: 'rgba(125, 60, 152, 0.12)',
   },
   menuBadgeText: {
     fontSize: 11,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   },
   menuDivider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(125, 60, 152, 0.06)',
     marginLeft: 64,
   },
   memberSince: {
