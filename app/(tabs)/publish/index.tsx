@@ -48,17 +48,25 @@ export default function PublishScreen() {
     d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
   const formatTimeDisplay = (d: Date) =>
     d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  const formatDateForDB = (d: Date) => d.toISOString().split('T')[0];
-  const formatTimeForDB = (d: Date) => d.toTimeString().slice(0, 5);
+  // Fix: use local date components to avoid UTC timezone shift
+  const formatDateForDB = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const formatTimeForDB = (d: Date) => {
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${min}`;
+  };
 
   const handleDatePress = useCallback(() => {
-    if (Platform.OS === 'web') return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowDatePicker(true);
   }, []);
 
   const handleTimePress = useCallback(() => {
-    if (Platform.OS === 'web') return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowTimePicker(true);
   }, []);
@@ -68,8 +76,16 @@ export default function PublishScreen() {
     let tripTime: string;
 
     if (Platform.OS === 'web') {
+      // dateText is "YYYY-MM-DD" from <input type="date">
+      // timeText is "HH:MM" from <input type="time">
       tripDate = dateText.trim();
       tripTime = timeText.trim();
+      const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(tripDate);
+      const timeOk = /^\d{2}:\d{2}$/.test(tripTime);
+      if (!dateOk || !timeOk) {
+        Alert.alert('Date/heure invalide', 'Veuillez sélectionner une date et une heure valides.');
+        return;
+      }
     } else {
       tripDate = dateSet ? formatDateForDB(selectedDate) : '';
       tripTime = timeSet ? formatTimeForDB(selectedTime) : '';
@@ -119,13 +135,15 @@ export default function PublishScreen() {
   }, [tripType, departure, arrival, selectedDate, selectedTime, dateSet, timeSet, seats, price, comments, createTripMutation, router, dateText, timeText]);
 
   let DateTimePickerNative: any = null;
-  if (Platform.OS !== 'web') {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      DateTimePickerNative = require('@react-native-community/datetimepicker').default;
-    } catch (err) {
-    }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    DateTimePickerNative = require('@react-native-community/datetimepicker').default;
+  } catch (err) {
+    // datetimepicker not available on this platform
   }
+
+  // Today's date in YYYY-MM-DD for the minimum date on the web picker
+  const todayStr = formatDateForDB(new Date());
 
   return (
     <View style={styles.container}>
@@ -220,13 +238,24 @@ export default function PublishScreen() {
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.inputLabel}>Date</Text>
                 {Platform.OS === 'web' ? (
-                  <TextInput
-                    style={styles.input}
-                    value={dateText}
-                    onChangeText={setDateText}
-                    placeholder="2026-03-05"
-                    placeholderTextColor={Colors.textMuted}
-                  />
+                  // Use native HTML date picker on web
+                  React.createElement('input', {
+                    type: 'date',
+                    value: dateText,
+                    min: todayStr,
+                    onChange: (e: any) => setDateText(e.target.value),
+                    style: {
+                      backgroundColor: 'rgba(255,255,255,0.60)',
+                      border: '1px solid rgba(33,150,243,0.20)',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      fontSize: 15,
+                      color: Colors.text,
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      fontFamily: 'inherit',
+                    },
+                  })
                 ) : (
                   <Pressable onPress={handleDatePress} style={styles.pickerButton}>
                     <Calendar size={16} color={Colors.primary} />
@@ -239,13 +268,23 @@ export default function PublishScreen() {
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.inputLabel}>Heure</Text>
                 {Platform.OS === 'web' ? (
-                  <TextInput
-                    style={styles.input}
-                    value={timeText}
-                    onChangeText={setTimeText}
-                    placeholder="07:30"
-                    placeholderTextColor={Colors.textMuted}
-                  />
+                  // Use native HTML time picker on web
+                  React.createElement('input', {
+                    type: 'time',
+                    value: timeText,
+                    onChange: (e: any) => setTimeText(e.target.value),
+                    style: {
+                      backgroundColor: 'rgba(255,255,255,0.60)',
+                      border: '1px solid rgba(33,150,243,0.20)',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      fontSize: 15,
+                      color: Colors.text,
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      fontFamily: 'inherit',
+                    },
+                  })
                 ) : (
                   <Pressable onPress={handleTimePress} style={styles.pickerButton}>
                     <Clock size={16} color={Colors.primary} />
