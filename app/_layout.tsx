@@ -7,6 +7,8 @@ import { AppProvider, useApp } from "@/providers/AppProvider";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
+import { ToastProvider } from "@/components/Toast";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -14,20 +16,32 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, authLoading } = useApp();
   const segments = useSegments();
   const router = useRouter();
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (authLoading) return;
+    AsyncStorage.getItem('faso_autostop_onboarded').then((val) => {
+      setOnboardingDone(!!val);
+    });
+  }, []);
 
-    const inAuthGroup = segments[0] === 'login' || segments[0] === 'register';
+  useEffect(() => {
+    if (authLoading || onboardingDone === null) return;
 
-    if (!session && !inAuthGroup) {
-      router.replace('/login');
-    } else if (session && inAuthGroup) {
+    const inAuthGroup   = segments[0] === 'login' || segments[0] === 'register';
+    const inOnboarding  = segments[0] === 'onboarding';
+
+    if (!session && !inAuthGroup && !inOnboarding) {
+      if (!onboardingDone) {
+        router.replace('/onboarding');
+      } else {
+        router.replace('/login');
+      }
+    } else if (session && (inAuthGroup || inOnboarding)) {
       router.replace('/');
     }
-  }, [session, authLoading, segments, router]);
+  }, [session, authLoading, segments, router, onboardingDone]);
 
-  if (authLoading) {
+  if (authLoading || onboardingDone === null) {
     return (
       <View style={authStyles.loading}>
         <LinearGradient
@@ -60,6 +74,7 @@ function RootLayoutNav() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="register" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="trip-details" options={{ presentation: 'modal', headerShown: false }} />
@@ -94,7 +109,9 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <AppProvider>
-          <RootLayoutNav />
+          <ToastProvider>
+            <RootLayoutNav />
+          </ToastProvider>
         </AppProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>

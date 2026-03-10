@@ -1,24 +1,21 @@
 import React, { useState, useCallback } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TextInput,
-  Pressable,
-  StatusBar,
-  RefreshControl,
-  ActivityIndicator,
+  StyleSheet, Text, View, ScrollView, TextInput, Pressable,
+  StatusBar, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Search, MapPin, Navigation, Zap, SlidersHorizontal } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useSearchTrips, useApp } from '@/providers/AppProvider';
 import TripCard from '@/components/TripCard';
+import SkeletonCard from '@/components/SkeletonCard';
 import GlassCard from '@/components/GlassCard';
 import SortModal from '@/components/SortModal';
+import { useToast } from '@/components/Toast';
+import { supabase } from '@/lib/supabase';
 import { TripType, SortType } from '@/types';
 
 type FilterType = 'all' | TripType;
@@ -31,16 +28,14 @@ export default function SearchScreen() {
   const [sortType, setSortType] = useState<SortType>('recent');
   const [showSort, setShowSort] = useState(false);
   const results = useSearchTrips(query, activeFilter, sortType);
-  const { refetchTrips, isLoading } = useApp();
+  const { refetchTrips, isLoading, userId } = useApp();
+  const { showToast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
+  const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await refetchTrips();
-    } finally {
-      setRefreshing(false);
-    }
+    try { await refetchTrips(); } finally { setRefreshing(false); }
   }, [refetchTrips]);
 
   const filters: { key: FilterType; label: string; icon: React.ReactNode }[] = [
@@ -52,6 +47,37 @@ export default function SearchScreen() {
   const handleTripPress = useCallback((tripId: string) => {
     router.push({ pathname: '/trip-details', params: { id: tripId } });
   }, [router]);
+
+  const handleBook = useCallback(async (tripId: string, driverName: string) => {
+    if (!userId) {
+      showToast('❌ Connectez-vous pour réserver', 'error');
+      return;
+    }
+    if (bookingIds.has(tripId)) {
+      showToast('ℹ️ Vous avez déjà réservé ce trajet', 'info');
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const { error } = await supabase.from('bookings').insert({
+      trip_id: tripId,
+      passenger_id: userId,
+      status: 'pending',
+    });
+
+    if (error) {
+      if (error.code === '23505') {
+        showToast('ℹ️ Vous avez déjà réservé ce trajet', 'info');
+      } else {
+        showToast('❌ Erreur réseau. Vérifiez votre connexion.', 'error');
+      }
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setBookingIds(prev => new Set([...prev, tripId]));
+      showToast(`✅ Réservation envoyée à ${driverName} !`, 'success');
+    }
+  }, [userId, bookingIds, showToast]);
 
   return (
     <View style={styles.container}>
@@ -91,7 +117,13 @@ export default function SearchScreen() {
               onChangeText={setQuery}
               placeholder="Quartier, ville, conducteur..."
               placeholderTextColor={Colors.textMuted}
+              returnKeyType="search"
             />
+            {query.length > 0 && (
+              <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                <Text style={styles.clearButton}>✕</Text>
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -99,19 +131,14 @@ export default function SearchScreen() {
           {filters.map((f) => (
             <Pressable
               key={f.key}
-              onPress={() => setActiveFilter(f.key)}
-              style={[
-                styles.filterChip,
-                activeFilter === f.key && styles.filterChipActive,
-              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setActiveFilter(f.key);
+              }}
+              style={[styles.filterChip, activeFilter === f.key && styles.filterChipActive]}
             >
               {f.icon}
-              <Text
-                style={[
-                  styles.filterText,
-                  activeFilter === f.key && styles.filterTextActive,
-                ]}
-              >
+              <Text style={[styles.filterText, activeFilter === f.key && styles.filterTextActive]}>
                 {f.label}
               </Text>
             </Pressable>
@@ -128,31 +155,40 @@ export default function SearchScreen() {
           </Pressable>
         </View>
 
+        {/* Skeleton loading */}
         {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-          </View>
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
         )}
 
+        {/* Results */}
         {!isLoading && results.map((trip) => (
           <TripCard
             key={trip.id}
             trip={trip}
             onPress={() => handleTripPress(trip.id)}
+            onBook={trip.user_id !== userId ? () => handleBook(trip.id, trip.profiles?.full_name ?? 'le conducteur') : undefined}
           />
         ))}
 
+        {/* Empty state */}
         {!isLoading && results.length === 0 && (
-          <GlassCard style={styles.emptyCard}>
-            <Search size={40} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>Aucun résultat</Text>
-            <Text style={styles.emptySubtext}>
-              Essayez un autre quartier ou changez le filtre
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyEmoji}>🔍</Text>
+            <Text style={styles.emptyTitle}>
+              {query ? 'Aucun trajet trouvé' : 'Aucun trajet disponible'}
             </Text>
-          </GlassCard>
+            <Text style={styles.emptySubtext}>
+              {query
+                ? `Aucun résultat pour "${query}". Essayez avec d'autres mots-clés.`
+                : 'Il n\'y a pas encore de trajets publiés.'}
+            </Text>
+          </View>
         )}
 
-        <View style={{ height: 20 }} />
+        <View style={{ height: 24 }} />
       </ScrollView>
 
       <SortModal
@@ -166,123 +202,46 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  topGlow: {
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800' as const,
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    marginBottom: 16,
-  },
-  searchRow: {
-    marginBottom: 14,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  topGlow: { position: 'absolute' as const, top: 0, left: 0, right: 0, height: 300 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16 },
+  title: { fontSize: 26, fontWeight: '800' as const, color: Colors.text, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: Colors.textMuted, marginBottom: 16 },
+  searchRow: { marginBottom: 14 },
   searchInputContainer: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row' as const, alignItems: 'center' as const,
     backgroundColor: 'rgba(255, 255, 255, 0.70)',
-    borderWidth: 1,
-    borderColor: 'rgba(33, 150, 243, 0.12)',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    gap: 10,
+    borderWidth: 1, borderColor: 'rgba(33, 150, 243, 0.15)',
+    borderRadius: 14, paddingHorizontal: 14, gap: 10, minHeight: 52,
   },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: Colors.text,
-  },
-  filterRow: {
-    flexDirection: 'row' as const,
-    gap: 8,
-    marginBottom: 16,
-  },
+  searchInput: { flex: 1, paddingVertical: 14, fontSize: 16, color: Colors.text },
+  clearButton: { fontSize: 16, color: Colors.textMuted, paddingHorizontal: 4 },
+  filterRow: { flexDirection: 'row' as const, gap: 8, marginBottom: 16 },
   filterChip: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(33, 150, 243, 0.12)',
+    borderWidth: 1, borderColor: 'rgba(33, 150, 243, 0.12)', minHeight: 40,
   },
-  filterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.textSecondary,
-  },
-  filterTextActive: {
-    color: Colors.white,
-  },
+  filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  filterText: { fontSize: 13, fontWeight: '600' as const, color: Colors.textSecondary },
+  filterTextActive: { color: Colors.white },
   resultHeader: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    marginBottom: 12,
+    flexDirection: 'row' as const, justifyContent: 'space-between' as const,
+    alignItems: 'center' as const, marginBottom: 12,
   },
-  resultCount: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '500' as const,
-  },
+  resultCount: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' as const },
   sortButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.60)',
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4,
+    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.60)', minHeight: 36,
   },
-  sortText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '500' as const,
-  },
-  loadingContainer: {
-    alignItems: 'center' as const,
-    paddingVertical: 32,
-  },
-  emptyCard: {
-    alignItems: 'center' as const,
-    paddingVertical: 40,
-    gap: 10,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.textSecondary,
-  },
+  sortText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' as const },
+  emptyContainer: { alignItems: 'center' as const, paddingVertical: 56, paddingHorizontal: 24 },
+  emptyEmoji: { fontSize: 56, marginBottom: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: '700' as const, color: Colors.text, marginBottom: 8 },
   emptySubtext: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    textAlign: 'center' as const,
+    fontSize: 14, color: Colors.textSecondary, textAlign: 'center' as const, lineHeight: 22,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -32,6 +32,15 @@ import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
 import { supabase } from '@/lib/supabase';
+
+function getInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('') || '?';
+}
 
 interface MenuItemProps {
   icon: React.ReactNode;
@@ -165,8 +174,21 @@ export default function ProfileScreen() {
 
   const displayName = profile?.full_name || 'Compléter mon profil';
   const displayEmail = session?.user?.email ?? '';
-  const displayAvatar = localAvatar ?? profile?.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face';
+  const hasAvatar = !!(localAvatar ?? profile?.avatar_url);
+  const displayAvatarUri = localAvatar ?? profile?.avatar_url ?? undefined;
+  const avatarInitials = profile?.full_name
+    ? getInitials(profile.full_name)
+    : (session?.user?.email?.[0]?.toUpperCase() ?? '?');
   const isVerified = profile?.is_verified ?? false;
+
+  const completionPct = useMemo(() => {
+    let score = 0;
+    if (profile?.full_name) score += 25;
+    if (profile?.avatar_url || localAvatar) score += 25;
+    if (profile?.is_verified) score += 25;
+    if ((userTripsCount ?? 0) > 0) score += 25;
+    return score;
+  }, [profile, localAvatar, userTripsCount]);
   const rating = profile?.rating ?? 5.0;
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
@@ -231,7 +253,13 @@ export default function ProfileScreen() {
         <GlassCard variant="accent" style={styles.profileCard}>
           <View style={styles.profileHeader}>
             <Pressable onPress={handlePickAvatar} style={styles.avatarWrapper}>
-              <Image source={{ uri: displayAvatar }} style={styles.avatar} />
+              {hasAvatar ? (
+                <Image source={{ uri: displayAvatarUri }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.initialsAvatar]}>
+                  <Text style={styles.initialsAvatarText}>{avatarInitials}</Text>
+                </View>
+              )}
               {isVerified && (
                 <View style={styles.verifiedBadge}>
                   <BadgeCheck size={16} color={Colors.primary} fill={Colors.white} />
@@ -269,6 +297,35 @@ export default function ProfileScreen() {
                 {isVerified ? 'Oui' : 'Non'}
               </Text>
               <Text style={styles.statLabel}>Vérifié</Text>
+            </View>
+          </View>
+
+          {/* Profile completion bar */}
+          <View style={styles.completionSection}>
+            <View style={styles.completionHeader}>
+              <Text style={styles.completionLabel}>Profil complété à {completionPct}%</Text>
+              {completionPct < 100 && (
+                <Text style={styles.completionHint}>
+                  {completionPct < 50 ? 'À compléter' : completionPct < 75 ? 'Presque là !' : 'Presque parfait !'}
+                </Text>
+              )}
+              {completionPct === 100 && (
+                <Text style={[styles.completionHint, { color: Colors.green }]}>✓ Complet</Text>
+              )}
+            </View>
+            <View style={styles.completionBarBg}>
+              <View
+                style={[
+                  styles.completionBarFill,
+                  {
+                    width: `${completionPct}%` as any,
+                    backgroundColor:
+                      completionPct === 100 ? Colors.green
+                      : completionPct >= 75  ? Colors.primary
+                      : Colors.orange,
+                  },
+                ]}
+              />
             </View>
           </View>
         </GlassCard>
@@ -509,6 +566,47 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(33, 150, 243, 0.06)',
     marginLeft: 64,
+  },
+  initialsAvatar: {
+    backgroundColor: 'rgba(33, 150, 243, 0.15)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  initialsAvatarText: {
+    fontSize: 22,
+    fontWeight: '800' as const,
+    color: Colors.primary,
+  },
+  completionSection: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(33, 150, 243, 0.08)',
+  },
+  completionHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: 8,
+  },
+  completionLabel: {
+    fontSize: 12,
+    fontWeight: '700' as const,
+    color: Colors.text,
+  },
+  completionHint: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  completionBarBg: {
+    height: 6,
+    backgroundColor: 'rgba(33, 150, 243, 0.12)',
+    borderRadius: 4,
+    overflow: 'hidden' as const,
+  },
+  completionBarFill: {
+    height: 6,
+    borderRadius: 4,
   },
   memberSince: {
     fontSize: 12,

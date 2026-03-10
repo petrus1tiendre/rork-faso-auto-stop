@@ -2,11 +2,17 @@ import { Tabs } from "expo-router";
 import { Home, PlusCircle, Search, MessageCircle, User } from "lucide-react-native";
 import React from "react";
 import { Platform } from "react-native";
+import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 
 export default function TabLayout() {
   return (
     <Tabs
+      screenListeners={{
+        tabPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: Colors.primary,

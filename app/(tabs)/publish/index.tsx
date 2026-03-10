@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -39,10 +39,21 @@ export default function PublishScreen() {
   const [seats, setSeats] = useState<number>(3);
   const [price, setPrice] = useState<string>('');
   const [comments, setComments] = useState<string>('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [dateText, setDateText] = useState<string>('');
   const [timeText, setTimeText] = useState<string>('');
 
   const suggestedPrice = tripType === 'interville' ? '5 000' : '500';
+
+  const canPublish = useMemo(() => {
+    const hasDate = Platform.OS === 'web'
+      ? /^\d{4}-\d{2}-\d{2}$/.test(dateText.trim())
+      : dateSet;
+    const hasTime = Platform.OS === 'web'
+      ? /^\d{2}:\d{2}$/.test(timeText.trim())
+      : timeSet;
+    return departure.trim().length > 0 && arrival.trim().length > 0 && hasDate && hasTime;
+  }, [departure, arrival, dateText, timeText, dateSet, timeSet]);
 
   const formatDateDisplay = (d: Date) =>
     d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -91,8 +102,15 @@ export default function PublishScreen() {
       tripTime = timeSet ? formatTimeForDB(selectedTime) : '';
     }
 
-    if (!departure.trim() || !arrival.trim() || !tripDate || !tripTime) {
-      Alert.alert('Champs requis', 'Veuillez remplir tous les champs obligatoires.');
+    const newErrors: Record<string, string> = {};
+    if (!departure.trim()) newErrors.departure = 'Le lieu de départ est requis';
+    if (!arrival.trim()) newErrors.arrival = "Le lieu d'arrivée est requis";
+    if (!tripDate) newErrors.date = 'La date est requise';
+    if (!tripTime) newErrors.time = "L'heure est requise";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
@@ -202,14 +220,20 @@ export default function PublishScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Départ</Text>
+              <Text style={styles.inputLabel}>
+                Départ <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.departure && styles.inputError]}
                 value={departure}
-                onChangeText={setDeparture}
+                onChangeText={(text) => {
+                  setDeparture(text);
+                  if (errors.departure) setErrors((e) => ({ ...e, departure: undefined }));
+                }}
                 placeholder={tripType === 'urbain' ? 'Ex: Ouaga 2000' : 'Ex: Ouagadougou'}
                 placeholderTextColor={Colors.textMuted}
               />
+              {errors.departure && <Text style={styles.errorText}>{errors.departure}</Text>}
             </View>
 
             <View style={styles.swapRow}>
@@ -217,14 +241,20 @@ export default function PublishScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Arrivée</Text>
+              <Text style={styles.inputLabel}>
+                Arrivée <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.arrival && styles.inputError]}
                 value={arrival}
-                onChangeText={setArrival}
+                onChangeText={(text) => {
+                  setArrival(text);
+                  if (errors.arrival) setErrors((e) => ({ ...e, arrival: undefined }));
+                }}
                 placeholder={tripType === 'urbain' ? 'Ex: Tampouy' : 'Ex: Bobo-Dioulasso'}
                 placeholderTextColor={Colors.textMuted}
               />
+              {errors.arrival && <Text style={styles.errorText}>{errors.arrival}</Text>}
             </View>
           </GlassCard>
 
@@ -236,7 +266,7 @@ export default function PublishScreen() {
 
             <View style={styles.rowInputs}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.inputLabel}>Date</Text>
+                <Text style={styles.inputLabel}>Date <Text style={styles.required}>*</Text></Text>
                 {Platform.OS === 'web' ? (
                   // Use native HTML date picker on web
                   React.createElement('input', {
@@ -266,7 +296,7 @@ export default function PublishScreen() {
                 )}
               </View>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.inputLabel}>Heure</Text>
+                <Text style={styles.inputLabel}>Heure <Text style={styles.required}>*</Text></Text>
                 {Platform.OS === 'web' ? (
                   // Use native HTML time picker on web
                   React.createElement('input', {
@@ -402,7 +432,11 @@ export default function PublishScreen() {
             />
           </GlassCard>
 
-          <Pressable onPress={handlePublish} style={[styles.publishButton, isPublishing && { opacity: 0.7 }]} disabled={isPublishing}>
+          <Pressable
+            onPress={handlePublish}
+            style={[styles.publishButton, (!canPublish || isPublishing) && { opacity: 0.5 }]}
+            disabled={!canPublish || isPublishing}
+          >
             <LinearGradient
               colors={[Colors.primary, Colors.primaryDark]}
               start={{ x: 0, y: 0 }}
@@ -595,6 +629,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700' as const,
     color: Colors.primary,
+  },
+  required: {
+    color: Colors.danger,
+  },
+  inputError: {
+    borderColor: Colors.danger,
+    backgroundColor: 'rgba(244, 67, 54, 0.05)',
+  },
+  errorText: {
+    fontSize: 11,
+    color: Colors.danger,
+    marginTop: 4,
+    fontWeight: '500' as const,
   },
   suggestRow: {
     flexDirection: 'row' as const,
