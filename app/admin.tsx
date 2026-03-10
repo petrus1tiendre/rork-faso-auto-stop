@@ -34,6 +34,8 @@ import { Profile, Trip } from '@/types';
 
 type AdminTab = 'users' | 'trips' | 'documents' | 'stats';
 
+const ADMIN_EMAILS = ['hans2tiendrebeogo@gmail.com'];
+
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -41,31 +43,55 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const [refreshing, setRefreshing] = useState(false);
 
+  // Check admin authorization
+  const { data: sessionData } = useQuery({
+    queryKey: ['admin-session'],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      return data.session;
+    },
+  });
+
+  const isAdmin = sessionData?.user?.email && ADMIN_EMAILS.includes(sessionData.user.email);
+
+  if (!isAdmin) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} style={StyleSheet.absoluteFill} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 8 }}>Accès refusé</Text>
+          <Text style={{ fontSize: 14, color: Colors.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+            Vous n'avez pas les droits administrateur.
+          </Text>
+          <Pressable onPress={() => router.back()} style={{ backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+            <Text style={{ color: Colors.white, fontWeight: '700' }}>Retour</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   const profilesQuery = useQuery({
     queryKey: ['admin-profiles'],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (error) { console.log('[Admin] Profiles error:', error.message); return []; }
-        return (data ?? []) as Profile[];
-      } catch (e) { console.log('[Admin] Profiles exception:', e); return []; }
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return (data ?? []) as Profile[];
     },
   });
 
   const tripsQuery = useQuery({
     queryKey: ['admin-trips'],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('trips')
-          .select('*, profiles(full_name)')
-          .order('created_at', { ascending: false });
-        if (error) { console.log('[Admin] Trips error:', error.message); return []; }
-        return (data ?? []) as (Trip & { profiles: { full_name: string | null } | null })[];
-      } catch (e) { console.log('[Admin] Trips exception:', e); return []; }
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*, profiles(full_name)')
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return (data ?? []) as (Trip & { profiles: { full_name: string | null } | null })[];
     },
   });
 

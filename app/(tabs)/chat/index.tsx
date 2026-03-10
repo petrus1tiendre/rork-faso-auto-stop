@@ -8,6 +8,7 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -36,7 +37,6 @@ interface BookingChat {
 
 async function fetchBookings(userId: string | null): Promise<BookingChat[]> {
   if (!userId) return [];
-  console.log('[Chat] Fetching bookings for:', userId);
 
   const { data, error } = await supabase
     .from('bookings')
@@ -59,7 +59,6 @@ async function fetchBookings(userId: string | null): Promise<BookingChat[]> {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.log('[Chat] Bookings error:', error.message);
     return [];
   }
 
@@ -133,7 +132,10 @@ export default function ChatScreen() {
         )}
 
         {!bookingsLoading && bookings.length > 0 && bookings.map((booking) => (
-          <Pressable key={booking.id} onPress={() => console.log('[Chat] Open booking:', booking.id)}>
+          <Pressable key={booking.id} onPress={() => Alert.alert(
+            booking.trips?.profiles?.full_name ?? 'Conducteur',
+            `Trajet: ${booking.trips?.departure ?? ''} → ${booking.trips?.arrival ?? ''}\nStatut: ${booking.status === 'pending' ? 'En attente' : booking.status === 'confirmed' ? 'Confirmé' : booking.status}\n\nContactez le conducteur directement pour organiser votre trajet.`
+          )}>
             <GlassCard style={styles.chatCard}>
               <View style={styles.chatRow}>
                 <View style={styles.chatInfo}>

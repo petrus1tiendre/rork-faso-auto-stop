@@ -51,7 +51,6 @@ export default function RegisterScreen() {
       if (error) throw error;
 
       if (data.user) {
-        console.log('[Register] User created:', data.user.id);
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({
@@ -64,22 +63,14 @@ export default function RegisterScreen() {
             total_trips: 0,
           });
 
-        if (profileError) {
-          console.log('[Register] Profile creation error:', profileError.message);
-        } else {
-          console.log('[Register] Profile created successfully');
-        }
+        // Profile creation error is non-fatal, user can update later
 
         if (!data.session) {
-          console.log('[Register] No session returned, signing in manually...');
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email: email.trim(),
             password: password.trim(),
           });
-          if (signInError) {
-            console.log('[Register] Manual sign-in error:', signInError.message);
-          } else {
-            console.log('[Register] Manual sign-in success');
+          if (!signInError) {
             return signInData;
           }
         }
@@ -87,11 +78,7 @@ export default function RegisterScreen() {
 
       return data;
     },
-    onSuccess: () => {
-      console.log('[Register] Registration complete, user should be logged in');
-    },
     onError: (error: Error) => {
-      console.log('[Register] Error:', error.message);
       Alert.alert('Erreur d\'inscription', error.message);
     },
   });

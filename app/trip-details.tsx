@@ -110,15 +110,13 @@ export default function TripDetailsScreen() {
 
   const handlePayment = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!trip) return;
     Alert.alert(
       'Paiement Orange Money',
-      'Un lien de paiement sera envoyé au conducteur pour confirmer votre réservation.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Envoyer le paiement', onPress: () => console.log('[TripDetails] Payment link sent') },
-      ]
+      `Montant: ${trip.price_fcfa.toLocaleString()} FCFA\n\nPour payer, envoyez ce montant via Orange Money ou MoMo au conducteur après avoir réservé.\n\nÉtape 1: Réservez d'abord le trajet\nÉtape 2: Contactez le conducteur\nÉtape 3: Effectuez le paiement mobile`,
+      [{ text: 'Compris' }]
     );
-  }, []);
+  }, [trip]);
 
   if (!trip) {
     return (

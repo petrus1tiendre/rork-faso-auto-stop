@@ -10,7 +10,7 @@ export default function NotFoundScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#0A0E1A', '#0D1525', '#0A0E1A']}
+        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
         style={StyleSheet.absoluteFill}
       />
       <Text style={styles.title}>Page introuvable</Text>

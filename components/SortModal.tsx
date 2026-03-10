@@ -33,7 +33,7 @@ export default React.memo(function SortModal({ visible, onClose, currentSort, on
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <View style={styles.sheet}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <ArrowUpDown size={18} color={Colors.primary} />
@@ -68,7 +68,7 @@ export default React.memo(function SortModal({ visible, onClose, currentSort, on
               )}
             </Pressable>
           ))}
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );

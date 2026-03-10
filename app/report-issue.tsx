@@ -18,6 +18,8 @@ import { useRouter } from 'expo-router';
 import { AlertTriangle, ArrowLeft, Send } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import GlassCard from '@/components/GlassCard';
+import { supabase } from '@/lib/supabase';
+import { useApp } from '@/providers/AppProvider';
 
 const categories = [
   'Comportement dangereux',
@@ -30,11 +32,12 @@ const categories = [
 export default function ReportIssueScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { userId } = useApp();
   const [category, setCategory] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!category) {
       Alert.alert('Catégorie requise', 'Veuillez sélectionner une catégorie.');
       return;
@@ -45,16 +48,29 @@ export default function ReportIssueScreen() {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const { error } = await supabase.from('reports').insert({
+        user_id: userId,
+        category,
+        description: description.trim(),
+        status: 'pending',
+      });
+
+      if (error && error.code !== '42P01') {
+        throw error;
+      }
+
       Alert.alert(
         'Signalement envoyé',
         'Notre équipe examinera votre signalement sous 24h. Merci pour votre vigilance.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
-      console.log('[ReportIssue] Report submitted:', { category, description });
-    }, 1500);
-  }, [category, description, router]);
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? "Impossible d'envoyer le signalement.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [category, description, router, userId]);
 
   return (
     <View style={styles.container}>
@@ -146,20 +162,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   flex: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
-  backButton: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, marginBottom: 24 },
-  backText: { fontSize: 15, color: Colors.text, fontWeight: '600' as const },
-  header: { alignItems: 'center' as const, marginBottom: 28, gap: 8 },
-  title: { fontSize: 24, fontWeight: '800' as const, color: Colors.text },
-  subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' as const },
+  backButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 24 },
+  backText: { fontSize: 15, color: Colors.text, fontWeight: '600' },
+  header: { alignItems: 'center', marginBottom: 28, gap: 8 },
+  title: { fontSize: 24, fontWeight: '800', color: Colors.text },
+  subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
   formCard: { marginBottom: 20 },
-  inputLabel: { fontSize: 12, fontWeight: '600' as const, color: Colors.textSecondary, marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-  categoriesGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: 8 },
+  inputLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   categoryChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.60)', borderWidth: 1, borderColor: 'rgba(33,150,243,0.12)' },
   categoryChipActive: { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: Colors.danger },
-  categoryText: { fontSize: 13, fontWeight: '500' as const, color: Colors.textSecondary },
-  categoryTextActive: { color: Colors.danger, fontWeight: '700' as const },
+  categoryText: { fontSize: 13, fontWeight: '500', color: Colors.textSecondary },
+  categoryTextActive: { color: Colors.danger, fontWeight: '700' },
   textArea: { backgroundColor: 'rgba(255,255,255,0.60)', borderWidth: 1, borderColor: 'rgba(33,150,243,0.12)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: Colors.text, minHeight: 120, paddingTop: 12 },
-  submitButton: { marginTop: 16, borderRadius: 14, overflow: 'hidden' as const },
-  submitGradient: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 8, paddingVertical: 15, borderRadius: 14 },
-  submitText: { fontSize: 16, fontWeight: '700' as const, color: Colors.white },
+  submitButton: { marginTop: 16, borderRadius: 14, overflow: 'hidden' },
+  submitGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 14 },
+  submitText: { fontSize: 16, fontWeight: '700', color: Colors.white },
 });

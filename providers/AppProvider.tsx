@@ -23,7 +23,6 @@ function applySortToTrips(trips: Trip[], sort: SortType): Trip[] {
 }
 
 async function fetchTrips(): Promise<Trip[]> {
-  console.log('[AppProvider] Fetching trips from Supabase...');
   try {
     const { data, error } = await supabase
       .from('trips')
@@ -32,20 +31,16 @@ async function fetchTrips(): Promise<Trip[]> {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.log('[AppProvider] Supabase trips error:', error.message);
       return [];
     }
 
-    console.log('[AppProvider] Fetched trips:', data?.length ?? 0);
     return (data ?? []) as Trip[];
   } catch (e) {
-    console.log('[AppProvider] Trips fetch exception:', e);
     return [];
   }
 }
 
 async function fetchProfile(userId: string, userEmail?: string): Promise<Profile | null> {
-  console.log('[AppProvider] Fetching profile for:', userId);
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -54,7 +49,6 @@ async function fetchProfile(userId: string, userEmail?: string): Promise<Profile
       .single();
 
     if (error && error.code === 'PGRST116') {
-      console.log('[AppProvider] Profile not found, creating one...');
       const { data: newProfile, error: upsertError } = await supabase
         .from('profiles')
         .upsert({
@@ -70,21 +64,17 @@ async function fetchProfile(userId: string, userEmail?: string): Promise<Profile
         .single();
 
       if (upsertError) {
-        console.log('[AppProvider] Profile upsert error:', upsertError.message);
         return null;
       }
-      console.log('[AppProvider] Profile created via upsert');
       return newProfile as Profile;
     }
 
     if (error) {
-      console.log('[AppProvider] Profile fetch error:', error.message);
       return null;
     }
 
     return data as Profile;
   } catch (e) {
-    console.log('[AppProvider] Profile fetch exception:', e);
     return null;
   }
 }
@@ -97,15 +87,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   useEffect(() => {
-    console.log('[AppProvider] Checking initial session...');
     supabase.auth.getSession().then(({ data: { session: s } }) => {
-      console.log('[AppProvider] Initial session:', s ? 'found' : 'none');
       setSession(s);
       setAuthLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      console.log('[AppProvider] Auth state changed:', _event);
       setSession(s);
       if (s) {
         queryClient.invalidateQueries({ queryKey: ['profile'] });
@@ -148,12 +135,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId);
         if (error) {
-          console.log('[AppProvider] User trips count error:', error.message);
           return 0;
         }
         return count ?? 0;
       } catch (e) {
-        console.log('[AppProvider] User trips count exception:', e);
         return 0;
       }
     },
@@ -192,10 +177,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
         .single();
 
       if (error) {
-        console.log('[AppProvider] Insert trip error:', error.message);
         throw error;
       }
-      console.log('[AppProvider] Trip created:', data?.id);
       return data;
     },
     onSuccess: () => {
@@ -205,7 +188,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
   });
 
   const signOut = useCallback(async () => {
-    console.log('[AppProvider] Signing out...');
     await supabase.auth.signOut();
     queryClient.clear();
   }, [queryClient]);
@@ -228,7 +210,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
           setFavorites(JSON.parse(storedFavs) as string[]);
         }
       } catch (e) {
-        console.log('[AppProvider] Failed to load favorites:', e);
       }
     };
     loadFavorites();
@@ -238,12 +219,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
     const channel = supabase
       .channel('trips-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, (payload) => {
-        console.log('[AppProvider] Realtime trip change:', payload.eventType);
         queryClient.invalidateQueries({ queryKey: ['trips'] });
         queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
       })
       .subscribe((status) => {
-        console.log('[AppProvider] Realtime subscription:', status);
       });
 
     return () => {
@@ -257,7 +236,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
         ? prev.filter(id => id !== tripId)
         : [...prev, tripId];
       AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated)).catch(e => {
-        console.log('[AppProvider] Failed to save favorites:', e);
       });
       return updated;
     });
@@ -269,9 +247,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const { refetch: refetchTripsQuery } = tripsQuery;
 
-  const refetchTrips = useCallback(() => {
+  const refetchTrips = useCallback(async () => {
     setIsSyncing(true);
-    refetchTripsQuery().finally(() => setIsSyncing(false));
+    try {
+      await refetchTripsQuery();
+    } finally {
+      setIsSyncing(false);
+    }
   }, [refetchTripsQuery]);
 
   return {

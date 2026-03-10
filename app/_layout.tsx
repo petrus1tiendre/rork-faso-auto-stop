@@ -21,10 +21,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inAuthGroup = segments[0] === 'login' || segments[0] === 'register';
 
     if (!session && !inAuthGroup) {
-      console.log('[AuthGate] No session, redirecting to login');
       router.replace('/login');
     } else if (session && inAuthGroup) {
-      console.log('[AuthGate] Session found, redirecting to home');
       router.replace('/');
     }
   }, [session, authLoading, segments, router]);
@@ -88,7 +86,8 @@ export default function RootLayout() {
   }));
 
   useEffect(() => {
-    SplashScreen.hideAsync();
+    const timer = setTimeout(() => SplashScreen.hideAsync(), 500);
+    return () => clearTimeout(timer);
   }, []);
 
   return (

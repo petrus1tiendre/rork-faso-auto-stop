@@ -39,12 +39,10 @@ export default function MyTripsScreen() {
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
         if (error) {
-          console.log('[MyTrips] Fetch error:', error.message);
           return [];
         }
         return (data ?? []) as Trip[];
       } catch (e) {
-        console.log('[MyTrips] Exception:', e);
         return [];
       }
     },

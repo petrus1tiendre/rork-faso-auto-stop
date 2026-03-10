@@ -92,17 +92,22 @@ export default function ProfileScreen() {
       if (!result.canceled && result.assets[0]) {
         const uri = result.assets[0].uri;
         setLocalAvatar(uri);
-        console.log('[Profile] Avatar picked:', uri);
 
         if (session?.user?.id) {
           try {
             const fileName = `${session.user.id}-${Date.now()}.jpg`;
-            const response = await fetch(uri);
-            const blob = await response.blob();
+
+            // Use FormData for React Native compatibility
+            const formData = new FormData();
+            formData.append('file', {
+              uri,
+              name: fileName,
+              type: 'image/jpeg',
+            } as any);
 
             const { error: uploadError } = await supabase.storage
               .from('avatars')
-              .upload(fileName, blob, { upsert: true });
+              .upload(fileName, formData, { upsert: true });
 
             if (!uploadError) {
               const { data: publicUrl } = supabase.storage
@@ -114,17 +119,13 @@ export default function ProfileScreen() {
                 .eq('id', session.user.id);
 
               refetchProfile();
-              console.log('[Profile] Avatar uploaded successfully');
             } else {
-              console.log('[Profile] Avatar upload error:', uploadError.message);
             }
           } catch (e) {
-            console.log('[Profile] Avatar upload failed:', e);
           }
         }
       }
     } catch (e) {
-      console.log('[Profile] Image picker error:', e);
     }
   }, [session, refetchProfile]);
 
@@ -135,7 +136,6 @@ export default function ProfileScreen() {
         text: 'Oui',
         style: 'destructive',
         onPress: () => {
-          console.log('[Profile] Logging out...');
           signOut();
         },
       },

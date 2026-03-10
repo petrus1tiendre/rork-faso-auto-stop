@@ -32,10 +32,13 @@ export default function HomeScreen() {
   const [sortType, setSortType] = useState<SortType>('recent');
   const [showSort, setShowSort] = useState(false);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    refetchTrips();
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      await refetchTrips();
+    } finally {
+      setRefreshing(false);
+    }
   }, [refetchTrips]);
 
   const filteredTrips = useFilteredTrips(activeFilter, sortType);

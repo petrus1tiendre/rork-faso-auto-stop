@@ -110,11 +110,9 @@ export default function PublishScreen() {
           setSeats(3);
           setPrice('');
           setComments('');
-          console.log('[PublishScreen] Trip published successfully');
         },
         onError: (error: Error) => {
           Alert.alert('Erreur', error.message || 'Impossible de publier le trajet.');
-          console.log('[PublishScreen] Publish error:', error.message);
         },
       }
     );
@@ -126,7 +124,6 @@ export default function PublishScreen() {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       DateTimePickerNative = require('@react-native-community/datetimepicker').default;
     } catch (err) {
-      console.log('[PublishScreen] DateTimePicker not available', err);
     }
   }
 

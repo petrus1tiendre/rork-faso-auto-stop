@@ -37,11 +37,9 @@ export default function LoginScreen() {
         password: password.trim(),
       });
       if (error) throw error;
-      console.log('[Login] Success:', data.user?.id);
       return data;
     },
     onError: (error: Error) => {
-      console.log('[Login] Error:', error.message);
       Alert.alert('Erreur de connexion', error.message);
     },
   });

@@ -34,10 +34,13 @@ export default function SearchScreen() {
   const { refetchTrips, isLoading } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    refetchTrips();
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      await refetchTrips();
+    } finally {
+      setRefreshing(false);
+    }
   }, [refetchTrips]);
 
   const filters: { key: FilterType; label: string; icon: React.ReactNode }[] = [
