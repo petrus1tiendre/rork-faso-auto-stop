@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Mail, Lock, LogIn, UserPlus } from 'lucide-react-native';
+import { Mail, Lock, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react-native';
 import { useMutation } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
@@ -26,6 +26,8 @@ export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [resetLoading, setResetLoading] = useState<boolean>(false);
 
   const loginMutation = useMutation({
     mutationFn: async () => {
@@ -49,6 +51,28 @@ export default function LoginScreen() {
   const handleLogin = useCallback(() => {
     loginMutate();
   }, [loginMutate]);
+
+  const handleForgotPassword = useCallback(async () => {
+    const emailTrimmed = email.trim();
+    if (!emailTrimmed) {
+      Alert.alert(
+        'Mot de passe oublié',
+        'Saisissez d\'abord votre adresse email dans le champ ci-dessus, puis appuyez sur "Mot de passe oublié".'
+      );
+      return;
+    }
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed);
+    setResetLoading(false);
+    if (error) {
+      Alert.alert('Erreur', error.message);
+    } else {
+      Alert.alert(
+        'Email envoyé ✉️',
+        `Un lien de réinitialisation a été envoyé à ${emailTrimmed}.\n\nVérifiez votre boîte mail (et vos spams).`
+      );
+    }
+  }, [email]);
 
   return (
     <View style={styles.container}>
@@ -105,11 +129,31 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   placeholder="Mot de passe"
                   placeholderTextColor={Colors.textMuted}
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   testID="login-password"
                 />
+                <Pressable
+                  onPress={() => setShowPassword((v) => !v)}
+                  hitSlop={10}
+                  style={styles.eyeButton}
+                >
+                  {showPassword
+                    ? <EyeOff size={18} color={Colors.textMuted} />
+                    : <Eye size={18} color={Colors.textMuted} />
+                  }
+                </Pressable>
               </View>
             </View>
+
+            <Pressable
+              onPress={handleForgotPassword}
+              style={styles.forgotButton}
+              disabled={resetLoading}
+            >
+              <Text style={styles.forgotText}>
+                {resetLoading ? 'Envoi en cours...' : 'Mot de passe oublié ?'}
+              </Text>
+            </Pressable>
 
             <Pressable
               onPress={handleLogin}
@@ -212,6 +256,21 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 15,
     color: Colors.text,
+  },
+  eyeButton: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  forgotButton: {
+    alignSelf: 'flex-end' as const,
+    paddingVertical: 4,
+    marginBottom: 12,
+    marginTop: -6,
+  },
+  forgotText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600' as const,
   },
   submitButton: {
     marginTop: 8,
