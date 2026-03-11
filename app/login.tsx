@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Mail, Lock, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react-native';
 import { useMutation } from '@tanstack/react-query';
+import * as Linking from 'expo-linking';
 import Colors from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import GlassCard from '@/components/GlassCard';
@@ -62,7 +63,9 @@ export default function LoginScreen() {
       return;
     }
     setResetLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed);
+    // redirectTo points back to the app's reset-password screen (works on web + mobile deep link)
+    const redirectTo = Linking.createURL('reset-password');
+    const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, { redirectTo });
     setResetLoading(false);
     if (error) {
       Alert.alert('Erreur', error.message);

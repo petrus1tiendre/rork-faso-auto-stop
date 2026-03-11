@@ -27,16 +27,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (authLoading || onboardingDone === null) return;
 
-    const inAuthGroup   = segments[0] === 'login' || segments[0] === 'register';
-    const inOnboarding  = segments[0] === 'onboarding';
+    const inAuthGroup    = segments[0] === 'login' || segments[0] === 'register';
+    const inOnboarding   = segments[0] === 'onboarding';
+    const inResetPwd     = segments[0] === 'reset-password';
 
-    if (!session && !inAuthGroup && !inOnboarding) {
+    if (!session && !inAuthGroup && !inOnboarding && !inResetPwd) {
       if (!onboardingDone) {
         router.replace('/onboarding');
       } else {
         router.replace('/login');
       }
-    } else if (session && (inAuthGroup || inOnboarding)) {
+    } else if (session && (inAuthGroup || inOnboarding) && !inResetPwd) {
       router.replace('/');
     }
   }, [session, authLoading, segments, router, onboardingDone]);
@@ -76,6 +77,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Screen name="register" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="trip-details" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="profile-verification" options={{ presentation: 'modal', headerShown: false }} />
