@@ -87,20 +87,46 @@ export const [AppProvider, useApp] = createContextHook(() => { // eslint-disable
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s }, error }) => {
-      if (error) {
-        console.log('[Auth] getSession error, clearing session:', error.message);
-        supabase.auth.signOut().catch(() => {});
+    let isMounted = true;
+
+    const initSession = async () => {
+      try {
+        const { data: { session: s }, error } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        if (error) {
+          console.log('[Auth] getSession error:', error.message);
+          try { await supabase.auth.signOut(); } catch {}
+          setSession(null);
+        } else if (s) {
+          try {
+            const { data: { session: refreshed }, error: refreshError } = await supabase.auth.refreshSession();
+            if (!isMounted) return;
+            if (refreshError || !refreshed) {
+              console.log('[Auth] refreshSession failed:', refreshError?.message ?? 'no session');
+              try { await supabase.auth.signOut(); } catch {}
+              setSession(null);
+            } else {
+              setSession(refreshed);
+            }
+          } catch (refreshErr) {
+            console.log('[Auth] refreshSession fetch error:', refreshErr);
+            if (!isMounted) return;
+            try { await supabase.auth.signOut(); } catch {}
+            setSession(null);
+          }
+        } else {
+          setSession(null);
+        }
+      } catch (err) {
+        console.log('[Auth] getSession fetch error:', err);
+        if (!isMounted) return;
         setSession(null);
-      } else {
-        setSession(s);
+      } finally {
+        if (isMounted) setAuthLoading(false);
       }
-      setAuthLoading(false);
-    }).catch((err) => {
-      console.log('[Auth] getSession fetch error:', err);
-      setSession(null);
-      setAuthLoading(false);
-    });
+    };
+
+    void initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       console.log('[Auth] onAuthStateChange:', event);
@@ -124,6 +150,7 @@ export const [AppProvider, useApp] = createContextHook(() => { // eslint-disable
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [queryClient]);
