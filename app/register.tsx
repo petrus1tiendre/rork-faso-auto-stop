@@ -21,6 +21,35 @@ import Colors from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import GlassCard from '@/components/GlassCard';
 
+function translateAuthError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('user already registered') || lower.includes('already been registered')) {
+    return 'Un compte existe déjà avec cette adresse email.';
+  }
+  if (lower.includes('invalid email')) {
+    return 'Adresse email invalide.';
+  }
+  if (lower.includes('password') && (lower.includes('short') || lower.includes('least'))) {
+    return 'Le mot de passe doit contenir au moins 6 caractères.';
+  }
+  if (lower.includes('password') && lower.includes('weak')) {
+    return 'Le mot de passe est trop faible. Choisissez un mot de passe plus sécurisé.';
+  }
+  if (lower.includes('too many requests') || lower.includes('rate limit')) {
+    return 'Trop de tentatives. Veuillez réessayer dans quelques minutes.';
+  }
+  if (lower.includes('email rate limit exceeded')) {
+    return "Limite d'envoi d'emails atteinte. Réessayez plus tard.";
+  }
+  if (lower.includes('network') || lower.includes('fetch')) {
+    return 'Erreur de connexion réseau. Vérifiez votre connexion internet.';
+  }
+  if (lower.includes('signup is disabled')) {
+    return 'Les inscriptions sont temporairement désactivées.';
+  }
+  return message;
+}
+
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -51,7 +80,7 @@ export default function RegisterScreen() {
       if (error) throw error;
 
       if (data.user) {
-        const { error: profileError } = await supabase
+        const { error: _profileError } = await supabase
           .from('profiles')
           .upsert({
             id: data.user.id,
@@ -79,7 +108,8 @@ export default function RegisterScreen() {
       return data;
     },
     onError: (error: Error) => {
-      Alert.alert('Erreur d\'inscription', error.message);
+      const msg = translateAuthError(error.message);
+      Alert.alert('Erreur d\'inscription', msg);
     },
   });
 

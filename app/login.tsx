@@ -22,6 +22,35 @@ import Colors from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import GlassCard from '@/components/GlassCard';
 
+function translateAuthError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
+    return 'Email ou mot de passe incorrect.';
+  }
+  if (lower.includes('email not confirmed')) {
+    return 'Votre adresse email n\'a pas encore été confirmée. Vérifiez votre boîte mail.';
+  }
+  if (lower.includes('too many requests') || lower.includes('rate limit')) {
+    return 'Trop de tentatives. Veuillez réessayer dans quelques minutes.';
+  }
+  if (lower.includes('user not found')) {
+    return 'Aucun compte trouvé avec cette adresse email.';
+  }
+  if (lower.includes('email rate limit exceeded')) {
+    return 'Limite d\'envoi d\'emails atteinte. Réessayez plus tard.';
+  }
+  if (lower.includes('network') || lower.includes('fetch')) {
+    return 'Erreur de connexion réseau. Vérifiez votre connexion internet.';
+  }
+  if (lower.includes('password') && lower.includes('weak')) {
+    return 'Le mot de passe est trop faible. Choisissez un mot de passe plus sécurisé.';
+  }
+  if (lower.includes('signup is disabled')) {
+    return 'Les inscriptions sont temporairement désactivées.';
+  }
+  return message;
+}
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -43,7 +72,8 @@ export default function LoginScreen() {
       return data;
     },
     onError: (error: Error) => {
-      Alert.alert('Erreur de connexion', error.message);
+      const msg = translateAuthError(error.message);
+      Alert.alert('Erreur de connexion', msg);
     },
   });
 

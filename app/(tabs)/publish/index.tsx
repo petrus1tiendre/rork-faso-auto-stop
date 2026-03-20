@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Car, MapPin, Calendar, Users, Coins, MessageSquare, ArrowLeftRight, Clock } from 'lucide-react-native';
+import { Car, MapPin, Calendar, Users, MessageSquare, ArrowLeftRight, Clock } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
@@ -407,12 +407,7 @@ export default function PublishScreen() {
               </View>
             </View>
 
-            <View style={styles.suggestRow}>
-              <Coins size={12} color={Colors.orange} />
-              <Text style={styles.suggestText}>
-                Contribution suggérée : {suggestedPrice} FCFA/personne
-              </Text>
-            </View>
+
           </GlassCard>
 
           <GlassCard style={styles.section}>
@@ -427,8 +422,11 @@ export default function PublishScreen() {
               placeholder="Modèle de voiture, bagages acceptés, arrêts..."
               placeholderTextColor={Colors.textMuted}
               multiline
-              numberOfLines={3}
+              numberOfLines={4}
               textAlignVertical="top"
+              scrollEnabled={false}
+              blurOnSubmit={false}
+              returnKeyType="default"
             />
           </GlassCard>
 
@@ -557,7 +555,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   textArea: {
-    minHeight: 80,
+    minHeight: 100,
     paddingTop: 12,
   },
   swapRow: {
@@ -643,18 +641,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '500' as const,
   },
-  suggestRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 6,
-    marginTop: 6,
-    paddingHorizontal: 4,
-  },
-  suggestText: {
-    fontSize: 12,
-    color: Colors.orange,
-    fontWeight: '500' as const,
-  },
+
   publishButton: {
     marginTop: 6,
     borderRadius: 16,
