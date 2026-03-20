@@ -35,7 +35,7 @@ async function fetchTrips(): Promise<Trip[]> {
     }
 
     return (data ?? []) as Trip[];
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -74,12 +74,12 @@ async function fetchProfile(userId: string, userEmail?: string): Promise<Profile
     }
 
     return data as Profile;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 
-export const [AppProvider, useApp] = createContextHook(() => {
+export const [AppProvider, useApp] = createContextHook(() => { // eslint-disable-line rork/general-context-optimization
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
@@ -87,17 +87,39 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
+    supabase.auth.getSession().then(({ data: { session: s }, error }) => {
+      if (error) {
+        console.log('[Auth] getSession error, clearing session:', error.message);
+        supabase.auth.signOut().catch(() => {});
+        setSession(null);
+      } else {
+        setSession(s);
+      }
+      setAuthLoading(false);
+    }).catch((err) => {
+      console.log('[Auth] getSession fetch error:', err);
+      setSession(null);
       setAuthLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      console.log('[Auth] onAuthStateChange:', event);
+      if (event === 'TOKEN_REFRESHED' && !s) {
+        console.log('[Auth] Token refresh failed, signing out');
+        supabase.auth.signOut().catch(() => {});
+        setSession(null);
+        return;
+      }
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        queryClient.clear();
+        return;
+      }
       setSession(s);
       if (s) {
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        queryClient.invalidateQueries({ queryKey: ['trips'] });
-        queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
+        void queryClient.invalidateQueries({ queryKey: ['profile'] });
+        void queryClient.invalidateQueries({ queryKey: ['trips'] });
+        void queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
       }
     });
 
@@ -138,7 +160,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
           return 0;
         }
         return count ?? 0;
-      } catch (e) {
+      } catch {
         return 0;
       }
     },
@@ -182,8 +204,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trips'] });
-      queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
+      void queryClient.invalidateQueries({ queryKey: ['trips'] });
+      void queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
     },
   });
 
@@ -209,24 +231,24 @@ export const [AppProvider, useApp] = createContextHook(() => {
         if (storedFavs) {
           setFavorites(JSON.parse(storedFavs) as string[]);
         }
-      } catch (e) {
+      } catch {
       }
     };
-    loadFavorites();
+    void loadFavorites();
   }, []);
 
   useEffect(() => {
     const channel = supabase
       .channel('trips-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, (payload) => {
-        queryClient.invalidateQueries({ queryKey: ['trips'] });
-        queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, (_payload) => {
+        void queryClient.invalidateQueries({ queryKey: ['trips'] });
+        void queryClient.invalidateQueries({ queryKey: ['userTripsCount'] });
       })
-      .subscribe((status) => {
+      .subscribe((_status) => {
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
@@ -235,7 +257,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       const updated = prev.includes(tripId)
         ? prev.filter(id => id !== tripId)
         : [...prev, tripId];
-      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated)).catch(e => {
+      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated)).catch(() => {
       });
       return updated;
     });
