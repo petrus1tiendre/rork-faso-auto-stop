@@ -65,26 +65,27 @@ export default function ResetPasswordScreen() {
 
   useEffect(() => {
     if (Platform.OS === 'web') {
-      // On web the hash is in window.location
       const url = typeof window !== 'undefined' ? window.location.href : '';
-      if (url) {
+      console.log('[ResetPassword] Web URL:', url);
+      if (url && url.includes('#')) {
         handleUrl(url);
       } else {
-        // detectSessionInUrl may have already set a session
-        supabase.auth.getSession().then(({ data }) => {
-          setScreenState(data.session ? 'ready' : 'error');
-        });
+        console.log('[ResetPassword] No hash found in web URL, showing error');
+        setScreenState('error');
       }
     } else {
-      // On mobile, wait for the deep-link URL
       Linking.getInitialURL().then((url) => {
+        console.log('[ResetPassword] Mobile initial URL:', url);
         if (url) {
           handleUrl(url);
         } else {
           setScreenState('error');
         }
       });
-      const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+      const sub = Linking.addEventListener('url', ({ url }) => {
+        console.log('[ResetPassword] Mobile deep link URL:', url);
+        handleUrl(url);
+      });
       return () => sub.remove();
     }
   }, [handleUrl]);
