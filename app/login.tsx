@@ -64,9 +64,15 @@ export default function LoginScreen() {
     }
     setResetLoading(true);
     // redirectTo points back to the app's reset-password screen (works on web + mobile deep link)
-    const redirectTo = Platform.OS === 'web'
-      ? (typeof window !== 'undefined' ? window.location.origin + '/reset-password' : 'fasoautostop://reset-password')
-      : 'fasoautostop://reset-password';
+    let redirectTo = 'fasoautostop://reset-password';
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const base = window.location.href.split('#')[0].split('?')[0];
+      const pathParts = base.replace(/\/$/, '').split('/');
+      pathParts[pathParts.length - 1] = 'reset-password';
+      redirectTo = pathParts.join('/');
+      console.log('[ForgotPassword] Web redirectTo:', redirectTo);
+    }
+    console.log('[ForgotPassword] redirectTo:', redirectTo);
     const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, { redirectTo });
     setResetLoading(false);
     if (error) {
