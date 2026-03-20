@@ -73,12 +73,12 @@ export default function PublishScreen() {
   };
 
   const handleDatePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowDatePicker(true);
   }, []);
 
   const handleTimePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowTimePicker(true);
   }, []);
 
@@ -110,7 +110,7 @@ export default function PublishScreen() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
@@ -129,7 +129,7 @@ export default function PublishScreen() {
       },
       {
         onSuccess: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           Alert.alert(
             'Trajet publié !',
             'Votre trajet est maintenant visible par les passagers.',
@@ -156,7 +156,7 @@ export default function PublishScreen() {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     DateTimePickerNative = require('@react-native-community/datetimepicker').default;
-  } catch (err) {
+  } catch {
     // datetimepicker not available on this platform
   }
 
@@ -195,7 +195,7 @@ export default function PublishScreen() {
             </View>
             <View style={styles.typeRow}>
               <Pressable
-                onPress={() => { setTripType('urbain'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                onPress={() => { setTripType('urbain'); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
                 style={[styles.typeChip, tripType === 'urbain' && styles.typeChipActive]}
               >
                 <Text style={[styles.typeChipText, tripType === 'urbain' && styles.typeChipTextActive]}>
@@ -203,7 +203,7 @@ export default function PublishScreen() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => { setTripType('interville'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                onPress={() => { setTripType('interville'); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
                 style={[styles.typeChip, tripType === 'interville' && styles.typeChipActiveWarm]}
               >
                 <Text style={[styles.typeChipText, tripType === 'interville' && styles.typeChipTextActive]}>
@@ -228,7 +228,7 @@ export default function PublishScreen() {
                 value={departure}
                 onChangeText={(text) => {
                   setDeparture(text);
-                  if (errors.departure) setErrors((e) => ({ ...e, departure: undefined }));
+                  if (errors.departure) setErrors((e) => { const { departure: _, ...rest } = e; return rest; });
                 }}
                 placeholder={tripType === 'urbain' ? 'Ex: Ouaga 2000' : 'Ex: Ouagadougou'}
                 placeholderTextColor={Colors.textMuted}
@@ -249,7 +249,7 @@ export default function PublishScreen() {
                 value={arrival}
                 onChangeText={(text) => {
                   setArrival(text);
-                  if (errors.arrival) setErrors((e) => ({ ...e, arrival: undefined }));
+                  if (errors.arrival) setErrors((e) => { const { arrival: _, ...rest } = e; return rest; });
                 }}
                 placeholder={tripType === 'urbain' ? 'Ex: Tampouy' : 'Ex: Bobo-Dioulasso'}
                 placeholderTextColor={Colors.textMuted}
@@ -372,7 +372,7 @@ export default function PublishScreen() {
                     key={num}
                     onPress={() => {
                       setSeats(num);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }}
                     style={[
                       styles.seatButton,
