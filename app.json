@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.faso-auto-stop"
+      "bundleIdentifier": "app.vectorix.faso-auto-stop"
     },
     "android": {
       "adaptiveIcon": {
