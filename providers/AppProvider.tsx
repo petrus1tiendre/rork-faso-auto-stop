@@ -206,29 +206,49 @@ export const [AppProvider, useApp] = createContextHook(() => { // eslint-disable
       price_fcfa: number;
       comment: string | null;
     }) => {
-      if (!userId) throw new Error('Non connecté');
+      if (!userId) throw new Error('Vous devez être connecté pour publier un trajet.');
 
-      const { data, error } = await supabase
-        .from('trips')
-        .insert({
-          user_id: userId,
-          type: tripData.type,
-          departure: tripData.departure,
-          arrival: tripData.arrival,
-          trip_date: tripData.trip_date,
-          trip_time: tripData.trip_time,
-          seats: tripData.seats,
-          price_fcfa: tripData.price_fcfa,
-          comment: tripData.comment,
-          status: 'active',
-        })
-        .select('*, profiles(*)')
-        .single();
+      console.log('[CreateTrip] Inserting trip for user:', userId);
 
-      if (error) {
-        throw error;
+      let insertError: unknown = null;
+      let insertData: unknown = null;
+
+      try {
+        const result = await supabase
+          .from('trips')
+          .insert({
+            user_id: userId,
+            type: tripData.type,
+            departure: tripData.departure,
+            arrival: tripData.arrival,
+            trip_date: tripData.trip_date,
+            trip_time: tripData.trip_time,
+            seats: tripData.seats,
+            price_fcfa: tripData.price_fcfa,
+            comment: tripData.comment,
+            status: 'active',
+          })
+          .select('id, departure, arrival, trip_date, trip_time')
+          .single();
+
+        insertError = result.error;
+        insertData = result.data;
+      } catch (fetchErr) {
+        console.log('[CreateTrip] Fetch error:', fetchErr);
+        throw new Error('Impossible de se connecter au serveur. Vérifiez votre connexion internet.');
       }
-      return data;
+
+      if (insertError) {
+        console.log('[CreateTrip] Insert error:', insertError);
+        const msg = (insertError as { message?: string }).message ?? '';
+        if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
+          throw new Error('Impossible de se connecter au serveur. Vérifiez votre connexion internet.');
+        }
+        throw insertError as Error;
+      }
+
+      console.log('[CreateTrip] Trip created:', insertData);
+      return insertData;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['trips'] });
