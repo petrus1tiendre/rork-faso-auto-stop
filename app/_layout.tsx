@@ -10,7 +10,7 @@ import Colors from "@/constants/colors";
 import { ToastProvider } from "@/components/Toast";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, authLoading } = useApp();
@@ -19,10 +19,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('faso_autostop_onboarded').then((val) => {
+    void AsyncStorage.getItem('faso_autostop_onboarded').then((val) => {
       setOnboardingDone(!!val);
     });
   }, []);
+
+  useEffect(() => {
+    if (session === null && !authLoading) {
+      void AsyncStorage.getItem('faso_autostop_onboarded').then((val) => {
+        setOnboardingDone(!!val);
+      });
+    }
+  }, [session, authLoading]);
 
   useEffect(() => {
     if (authLoading || onboardingDone === null) return;

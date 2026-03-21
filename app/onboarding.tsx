@@ -1,7 +1,7 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated,
-  Dimensions, FlatList, StatusBar,
+  Dimensions, FlatList, StatusBar, PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -44,12 +44,17 @@ export default function OnboardingScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const router = useRouter();
 
+  const currentIndexRef = useRef(0);
+  const goToRef = useRef<(idx: number) => void>(() => {});
+  const handleFinishRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
   const goTo = useCallback((idx: number) => {
     Animated.sequence([
       Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
       Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
     ]).start();
     flatListRef.current?.scrollToIndex({ index: idx, animated: true });
+    currentIndexRef.current = idx;
     setCurrentIndex(idx);
   }, [fadeAnim]);
 
@@ -58,32 +63,57 @@ export default function OnboardingScreen() {
     router.replace('/login');
   }, [router]);
 
+  useEffect(() => {
+    goToRef.current = goTo;
+  }, [goTo]);
+
+  useEffect(() => {
+    handleFinishRef.current = handleFinish;
+  }, [handleFinish]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > Math.abs(gs.dy) && Math.abs(gs.dx) > 10,
+      onPanResponderRelease: (_, gs) => {
+        const idx = currentIndexRef.current;
+        if (gs.dx < -50) {
+          if (idx < slides.length - 1) {
+            goToRef.current(idx + 1);
+          } else {
+            void handleFinishRef.current();
+          }
+        } else if (gs.dx > 50 && idx > 0) {
+          goToRef.current(idx - 1);
+        }
+      },
+    })
+  ).current;
+
   const handleNext = useCallback(() => {
     if (currentIndex < slides.length - 1) {
       goTo(currentIndex + 1);
     } else {
-      handleFinish();
+      void handleFinish();
     }
   }, [currentIndex, goTo, handleFinish]);
 
   const slide = slides[currentIndex];
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       <StatusBar barStyle="dark-content" />
       <LinearGradient
         colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Skip button */}
       {currentIndex < slides.length - 1 && (
-        <Pressable onPress={handleFinish} style={styles.skipButton}>
+        <Pressable onPress={() => void handleFinish()} style={styles.skipButton}>
           <Text style={styles.skipText}>Passer</Text>
         </Pressable>
       )}
 
-      {/* Slides */}
       <FlatList
         ref={flatListRef}
         data={slides}
@@ -95,7 +125,6 @@ export default function OnboardingScreen() {
         renderItem={({ item, index }) => (
           <View style={[styles.slide, { width }]}>
             <Animated.View style={[styles.slideContent, { opacity: index === currentIndex ? fadeAnim : 1 }]}>
-              {/* Illustration circle */}
               <View style={[styles.emojiCircle, { backgroundColor: item.bg }]}>
                 <Text style={styles.emoji}>{item.emoji}</Text>
               </View>
@@ -106,7 +135,6 @@ export default function OnboardingScreen() {
         )}
       />
 
-      {/* Dots */}
       <View style={styles.dotsRow}>
         {slides.map((_, idx) => (
           <Pressable key={idx} onPress={() => goTo(idx)} hitSlop={12}>
@@ -115,7 +143,6 @@ export default function OnboardingScreen() {
         ))}
       </View>
 
-      {/* CTA Button */}
       <View style={styles.buttonContainer}>
         <Pressable onPress={handleNext} style={styles.nextButton}>
           <LinearGradient
