@@ -14,20 +14,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import {
-  Clock,
-  Users,
-  Star,
-  BadgeCheck,
-  Heart,
-  MessageCircle,
-  Phone,
-  Shield,
-  X,
-  Car,
-  Coins,
+  Clock, Users, Star, BadgeCheck, Heart,
+  Phone, Shield, X, Car, Coins,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
@@ -37,7 +28,8 @@ export default function TripDetailsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { trips, isFavorite, toggleFavorite, userId } = useApp();
+  const { trips, isFavorite, toggleFavorite, userId, profile } = useApp();
+  const queryClient = useQueryClient();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -78,20 +70,20 @@ export default function TripDetailsScreen() {
   });
   const existingBooking = existingBookingQuery.data ?? null;
 
+  const userIsVerified = profile?.is_verified ?? false;
+
   const bookMutation = useMutation({
     mutationFn: async () => {
       if (!userId || !trip) throw new Error('Non connecté');
       if (trip.user_id === userId) throw new Error('Vous ne pouvez pas réserver votre propre trajet.');
-      // Server-side duplicate guard
+      if (!userIsVerified) throw new Error('not_verified');
       if (existingBooking) throw new Error('already_booked');
+      if (trip.seats <= 0) throw new Error('no_seats');
 
+      // Insert as confirmed (auto-accept, no driver confirmation needed)
       const { data, error } = await supabase
         .from('bookings')
-        .insert({
-          trip_id: trip.id,
-          passenger_id: userId,
-          status: 'pending',
-        })
+        .insert({ trip_id: trip.id, passenger_id: userId, status: 'confirmed' })
         .select()
         .single();
 
@@ -99,25 +91,43 @@ export default function TripDetailsScreen() {
         if (error.code === '23505') throw new Error('already_booked');
         throw error;
       }
+
+      // Decrement seats
+      await supabase.from('trips')
+        .update({ seats: Math.max(trip.seats - 1, 0) })
+        .eq('id', trip.id);
+
       return data;
     },
     onSuccess: () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Refresh existing-booking so button becomes disabled
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       existingBookingQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: ['trips'] });
+      void queryClient.invalidateQueries({ queryKey: ['my-bookings-passenger', userId] });
       Alert.alert(
-        '✅ Réservation envoyée !',
-        'Le conducteur recevra votre demande. Retrouvez la conversation dans l\'onglet "Messages".',
+        '✅ Réservé !',
+        'Votre place est confirmée. Retrouvez les détails dans l\'onglet "Réservations".',
         [
-          { text: 'Voir dans Messages', onPress: () => { router.back(); router.push('/(tabs)/chat'); } },
+          { text: 'Voir mes réservations', onPress: () => { router.back(); router.push('/(tabs)/bookings'); } },
           { text: 'OK', style: 'cancel' },
         ]
       );
     },
     onError: (error: Error) => {
-      if (error.message === 'already_booked') {
+      if (error.message === 'not_verified') {
+        Alert.alert(
+          '🔒 Vérification requise',
+          'Vous devez vérifier votre identité avant de réserver.',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Vérifier maintenant', onPress: () => router.push('/identity-verification') },
+          ]
+        );
+      } else if (error.message === 'already_booked') {
         existingBookingQuery.refetch();
-        Alert.alert('Déjà réservé', 'Vous avez déjà une réservation active pour ce trajet. Retrouvez-la dans l\'onglet Messages.');
+        Alert.alert('Déjà réservé', 'Vous avez déjà une réservation active pour ce trajet. Retrouvez-la dans l\'onglet Réservations.');
+      } else if (error.message === 'no_seats') {
+        Alert.alert('Complet', 'Ce trajet n\'a plus de places disponibles.');
       } else {
         Alert.alert('Erreur', error.message);
       }
@@ -134,13 +144,13 @@ export default function TripDetailsScreen() {
   const { mutate: bookMutate } = bookMutation;
 
   const handleContact = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
-      'Réserver ce trajet',
-      'Envoyer une demande de réservation au conducteur ?',
+      'Confirmer la réservation',
+      `Réserver une place sur ce trajet ? La réservation est immédiate et confirmée automatiquement.`,
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Réserver', onPress: () => bookMutate() },
+        { text: 'Réserver maintenant', onPress: () => bookMutate() },
       ]
     );
   }, [bookMutate]);
@@ -299,9 +309,9 @@ export default function TripDetailsScreen() {
 
           <View style={styles.actionButtons}>
             {existingBooking ? (
-              /* Already booked → show status badge + go to chat */
+              /* Already booked → go to bookings tab */
               <Pressable
-                onPress={() => { router.back(); router.push('/(tabs)/chat'); }}
+                onPress={() => { router.back(); router.push('/(tabs)/bookings'); }}
                 style={[styles.contactButton]}
               >
                 <LinearGradient
@@ -310,27 +320,25 @@ export default function TripDetailsScreen() {
                   end={{ x: 1, y: 0 }}
                   style={styles.actionGradient}
                 >
-                  <MessageCircle size={18} color={Colors.white} />
-                  <Text style={styles.actionText}>
-                    {existingBooking.status === 'confirmed' ? '✅ Confirmé — Voir Messages' : '⏳ En attente — Voir Messages'}
-                  </Text>
+                  <Car size={18} color={Colors.white} />
+                  <Text style={styles.actionText}>✅ Réservé — Voir mes réservations</Text>
                 </LinearGradient>
               </Pressable>
             ) : (
               <Pressable
                 onPress={handleContact}
-                style={[styles.contactButton, (bookMutation.isPending || trip.user_id === userId) && { opacity: 0.7 }]}
-                disabled={bookMutation.isPending || trip.user_id === userId}
+                style={[styles.contactButton, (bookMutation.isPending || trip.user_id === userId || trip.seats <= 0) && { opacity: 0.7 }]}
+                disabled={bookMutation.isPending || trip.user_id === userId || trip.seats <= 0}
               >
                 <LinearGradient
-                  colors={trip.user_id === userId ? [Colors.textMuted, Colors.textMuted] : [Colors.primary, Colors.primaryDark]}
+                  colors={trip.user_id === userId ? [Colors.textMuted, Colors.textMuted] : trip.seats <= 0 ? [Colors.textMuted, Colors.textMuted] : [Colors.primary, Colors.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.actionGradient}
                 >
-                  <MessageCircle size={18} color={Colors.white} />
+                  <Car size={18} color={Colors.white} />
                   <Text style={styles.actionText}>
-                    {trip.user_id === userId ? 'Votre trajet' : bookMutation.isPending ? 'Réservation...' : 'Réserver'}
+                    {trip.user_id === userId ? 'Votre trajet' : trip.seats <= 0 ? 'Complet' : bookMutation.isPending ? 'Réservation...' : 'Réserver cette place'}
                   </Text>
                 </LinearGradient>
               </Pressable>

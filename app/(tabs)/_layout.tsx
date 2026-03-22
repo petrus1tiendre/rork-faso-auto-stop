@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, PlusCircle, Search, MessageCircle, User } from "lucide-react-native";
+import { Home, PlusCircle, Search, CalendarCheck, User } from "lucide-react-native";
 import React from "react";
 import { Platform } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -51,11 +51,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="bookings"
         options={{
-          title: "Chat",
-          tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
-
+          title: "Réservations",
+          tabBarIcon: ({ color, size }) => <CalendarCheck size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -64,6 +63,11 @@ export default function TabLayout() {
           title: "Profil",
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
         }}
+      />
+      {/* Hide the old chat tab */}
+      <Tabs.Screen
+        name="chat"
+        options={{ href: null }}
       />
     </Tabs>
   );

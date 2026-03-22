@@ -1,12 +1,12 @@
 import React, { useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, Pressable, Animated,
-  StatusBar, RefreshControl,
+  StatusBar, RefreshControl, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { MapPin, Navigation, Zap, SlidersHorizontal, PlusCircle } from 'lucide-react-native';
+import { MapPin, Navigation, Zap, SlidersHorizontal, PlusCircle, AlertTriangle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
@@ -26,6 +26,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { trips, isLoading, refetchTrips, profile, userId } = useApp();
+  const isVerified = profile?.is_verified ?? false;
   const { showToast } = useToast();
   const [refreshing, setRefreshing] = React.useState(false);
   const [activeFilter, setActiveFilter] = React.useState<FilterType>('all');
@@ -74,42 +75,60 @@ export default function HomeScreen() {
     router.push({ pathname: '/trip-details', params: { id: tripId } });
   }, [router]);
 
-  const handleBook = useCallback(async (tripId: string, driverName: string) => {
+  const handleBook = useCallback(async (tripId: string, currentSeats: number) => {
     if (!userId) {
       showToast('❌ Connectez-vous pour réserver', 'error');
       return;
     }
-    // Check DB-backed list (persists across restarts)
+    if (!isVerified) {
+      Alert.alert(
+        '🔒 Vérification requise',
+        'Vous devez vérifier votre identité avant de réserver un trajet.',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Vérifier maintenant', onPress: () => router.push('/identity-verification') },
+        ]
+      );
+      return;
+    }
     if (bookedTripIds.has(tripId)) {
       showToast('ℹ️ Vous avez déjà réservé ce trajet', 'info');
       return;
     }
+    if (currentSeats <= 0) {
+      showToast('❌ Ce trajet est complet', 'error');
+      return;
+    }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const { error } = await supabase.from('bookings').insert({
+    // 1. Insert booking as confirmed (auto-accept)
+    const { error: bookError } = await supabase.from('bookings').insert({
       trip_id: tripId,
       passenger_id: userId,
-      status: 'pending',
+      status: 'confirmed',
     });
 
-    if (error) {
-      if (error.code === '23505') {
-        // DB unique constraint caught it — refresh the local list
+    if (bookError) {
+      if (bookError.code === '23505') {
         queryClient.invalidateQueries({ queryKey: ['booked-trip-ids', userId] });
         showToast('ℹ️ Vous avez déjà réservé ce trajet', 'info');
       } else {
         showToast('❌ Erreur réseau. Vérifiez votre connexion.', 'error');
       }
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Refresh the booked-ids cache so the button becomes disabled immediately
-      queryClient.invalidateQueries({ queryKey: ['booked-trip-ids', userId] });
-      showToast(`✅ Réservé ! Ouvrez "Messages" pour contacter ${driverName}.`, 'success');
-      // Navigate to chat after short delay so toast is visible
-      setTimeout(() => router.push('/(tabs)/chat'), 1800);
+      return;
     }
-  }, [userId, bookedTripIds, showToast, queryClient, router]);
+
+    // 2. Decrement seats atomically
+    await supabase.from('trips')
+      .update({ seats: Math.max(currentSeats - 1, 0) })
+      .eq('id', tripId);
+
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    queryClient.invalidateQueries({ queryKey: ['booked-trip-ids', userId] });
+    queryClient.invalidateQueries({ queryKey: ['trips'] });
+    showToast('✅ Réservé ! Retrouvez votre trajet dans "Réservations".', 'success');
+  }, [userId, isVerified, bookedTripIds, showToast, queryClient, router]);
 
   const greeting = profile?.full_name ? `Salut ${profile.full_name.split(' ')[0]} 👋` : 'Salut 👋';
 
@@ -143,6 +162,21 @@ export default function HomeScreen() {
           <Text style={styles.title}>Faso Auto-stop</Text>
           <Text style={styles.subtitle}>Partagez vos trajets, économisez ensemble</Text>
         </Animated.View>
+
+        {/* Verification required banner */}
+        {!!userId && !isVerified && (
+          <Pressable
+            onPress={() => router.push('/identity-verification')}
+            style={styles.verifyBanner}
+          >
+            <AlertTriangle size={16} color={Colors.orange} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.verifyBannerTitle}>Vérifiez votre identité</Text>
+              <Text style={styles.verifyBannerText}>Requis pour réserver ou publier des trajets</Text>
+            </View>
+            <Text style={styles.verifyBannerArrow}>→</Text>
+          </Pressable>
+        )}
 
         <GlassCard variant="accent" style={styles.statsCard}>
           <View style={styles.statsRow}>
@@ -208,7 +242,7 @@ export default function HomeScreen() {
               trip.user_id !== userId && !!userId
                 ? bookedTripIds.has(trip.id)
                   ? null   // already booked → TripCard shows disabled state
-                  : () => handleBook(trip.id, trip.profiles?.full_name ?? 'le conducteur')
+                  : () => handleBook(trip.id, trip.seats)
                 : undefined
             }
             alreadyBooked={bookedTripIds.has(trip.id)}
@@ -300,4 +334,14 @@ const styles = StyleSheet.create({
     borderRadius: 14, minHeight: 50,
   },
   emptyButtonText: { fontSize: 15, fontWeight: '700' as const, color: Colors.white },
+  verifyBanner: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10,
+    backgroundColor: 'rgba(255,153,51,0.12)',
+    borderWidth: 1, borderColor: 'rgba(255,153,51,0.25)',
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12,
+    marginBottom: 14,
+  },
+  verifyBannerTitle: { fontSize: 13, fontWeight: '700' as const, color: Colors.orange },
+  verifyBannerText: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  verifyBannerArrow: { fontSize: 18, color: Colors.orange, fontWeight: '700' as const },
 });

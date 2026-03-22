@@ -1,14 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  Pressable,
-  StatusBar,
-  ActivityIndicator,
-  Alert,
-  Platform,
+  StyleSheet, Text, View, ScrollView, Pressable, StatusBar,
+  ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,7 +10,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowLeft, Camera, FileText, Shield, CheckCircle,
-  Clock, XCircle, Upload, AlertCircle,
+  Clock, XCircle, Upload, AlertCircle, Image as ImageIcon,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -44,29 +37,33 @@ interface DocInfo {
   description: string;
   icon: React.ReactNode;
   color: string;
+  cameraOnly: boolean; // true = selfie must be real-time
 }
 
 const DOC_INFOS: DocInfo[] = [
   {
     type: 'photo',
-    label: "Photo d'identité",
-    description: 'Selfie clair avec votre visage visible',
+    label: "Selfie · Photo d'identité",
+    description: 'Photo prise à l\'instant avec votre visage visible. La caméra frontale s\'ouvre automatiquement.',
     icon: <Camera size={22} color={Colors.primary} />,
     color: Colors.primary,
+    cameraOnly: true, // MUST be real-time camera
   },
   {
     type: 'cnb',
     label: 'CNB / CNIB',
-    description: 'Carte Nationale Biométrique du Burkina Faso (recto + verso)',
+    description: 'Carte Nationale Biométrique du Burkina Faso (recto + verso). Photo ou depuis la galerie.',
     icon: <Shield size={22} color={Colors.orange} />,
     color: Colors.orange,
+    cameraOnly: false,
   },
   {
     type: 'casier',
     label: 'Casier judiciaire (Bulletin N°3)',
-    description: 'Extrait du casier judiciaire datant de moins de 3 mois',
+    description: 'Extrait du casier judiciaire datant de moins de 3 mois. Photo ou depuis la galerie.',
     icon: <FileText size={22} color={Colors.green} />,
     color: Colors.green,
+    cameraOnly: false,
   },
 ];
 
@@ -80,7 +77,7 @@ const STATUS_INFO: Record<DocStatus, { label: string; icon: React.ReactNode; col
 export default function IdentityVerificationScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userId, session } = useApp();
+  const { userId } = useApp();
 
   const [docs, setDocs] = useState<Record<DocType, DocRecord | null>>({
     photo: null, cnb: null, casier: null,
@@ -100,79 +97,136 @@ export default function IdentityVerificationScreen() {
 
     const map: Record<DocType, DocRecord | null> = { photo: null, cnb: null, casier: null };
     for (const doc of (data ?? []) as DocRecord[]) {
-      // Keep most recent per type
       if (!map[doc.doc_type]) map[doc.doc_type] = doc;
     }
     setDocs(map);
     setLoading(false);
   }, [userId]);
 
-  useEffect(() => { loadDocs(); }, [loadDocs]);
+  useEffect(() => { void loadDocs(); }, [loadDocs]);
 
-  /* ─── Pick & upload ─── */
-  const handleUpload = useCallback(async (docType: DocType) => {
+  /* ─── Request camera permissions ─── */
+  const requestCameraPermission = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === 'web') return true;
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission requise',
+        'L\'accès à la caméra est nécessaire pour prendre votre selfie. Activez-le dans les paramètres.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+    return true;
+  }, []);
+
+  /* ─── Upload helper ─── */
+  const uploadImage = useCallback(async (docType: DocType, uri: string) => {
     if (!userId) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.75,
-      aspect: docType === 'photo' ? [1, 1] : [4, 3],
-    });
-
-    if (result.canceled || !result.assets[0]) return;
-    const { uri } = result.assets[0];
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setUploading(docType);
 
     try {
-      const ext = uri.split('.').pop() ?? 'jpg';
+      const ext = uri.split('.').pop()?.split('?')[0] ?? 'jpg';
       const fileName = `${userId}/${docType}-${Date.now()}.${ext}`;
 
-      // Upload to storage
       const formData = new FormData();
       formData.append('file', { uri, name: fileName, type: 'image/jpeg' } as any);
 
-      const { error: uploadError, data: uploadData } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(fileName, formData, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get signed URL (valid for 10 years)
       const { data: signedData } = await supabase.storage
         .from('documents')
-        .createSignedUrl(fileName, 60 * 60 * 24 * 3650);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 3650); // 10 years
 
       const fileUrl = signedData?.signedUrl ?? '';
 
-      // Upsert into documents table
       const { error: insertError } = await supabase
         .from('documents')
-        .insert({
-          user_id: userId,
-          doc_type: docType,
-          file_url: fileUrl,
-          status: 'pending',
-        });
+        .insert({ user_id: userId, doc_type: docType, file_url: fileUrl, status: 'pending' });
 
       if (insertError) throw insertError;
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await loadDocs();
     } catch (err: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Erreur', err?.message ?? 'Impossible d\'envoyer le document.');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Erreur', err?.message ?? "Impossible d'envoyer le document.");
     } finally {
       setUploading(null);
     }
   }, [userId, loadDocs]);
 
+  /* ─── Handle upload: camera-only vs choice ─── */
+  const handleUpload = useCallback(async (docType: DocType, info: DocInfo) => {
+    if (!userId) return;
+
+    if (info.cameraOnly) {
+      // SELFIE: always use real-time camera (front-facing)
+      const ok = await requestCameraPermission();
+      if (!ok) return;
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.75,
+        cameraType: ImagePicker.CameraType.front,
+      });
+      if (!result.canceled && result.assets[0]) {
+        await uploadImage(docType, result.assets[0].uri);
+      }
+    } else {
+      // CNIB / CASIER: let user choose between camera and gallery
+      Alert.alert(
+        'Source de la photo',
+        'Comment souhaitez-vous ajouter ce document ?',
+        [
+          {
+            text: '📷 Prendre une photo',
+            onPress: async () => {
+              const ok = await requestCameraPermission();
+              if (!ok) return;
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.75,
+              });
+              if (!result.canceled && result.assets[0]) {
+                await uploadImage(docType, result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: '🖼 Depuis la galerie',
+            onPress: async () => {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.75,
+              });
+              if (!result.canceled && result.assets[0]) {
+                await uploadImage(docType, result.assets[0].uri);
+              }
+            },
+          },
+          { text: 'Annuler', style: 'cancel' },
+        ]
+      );
+    }
+  }, [userId, requestCameraPermission, uploadImage]);
+
   /* ─── Overall status ─── */
-  const allApproved = Object.values(docs).every((d) => d?.status === 'approved');
-  const anyRejected = Object.values(docs).some((d) => d?.status === 'rejected');
-  const anyPending  = Object.values(docs).some((d) => d?.status === 'pending');
+  const allApproved  = Object.values(docs).every((d) => d?.status === 'approved');
+  const anyRejected  = Object.values(docs).some((d) => d?.status === 'rejected');
+  const anyPending   = Object.values(docs).some((d) => d?.status === 'pending');
+  const allSubmitted = Object.values(docs).every((d) => !!d);
   const noneSubmitted = Object.values(docs).every((d) => !d);
 
   return (
@@ -198,9 +252,22 @@ export default function IdentityVerificationScreen() {
           <Shield size={32} color={Colors.primary} />
           <Text style={styles.pageTitle}>Vérification d'identité</Text>
           <Text style={styles.pageSubtitle}>
-            Soumettez vos documents pour obtenir le badge vérifié et accéder à toutes les fonctionnalités.
+            Obligatoire pour réserver ou publier des trajets. Nos équipes examinent votre dossier sous 24–48h.
           </Text>
         </View>
+
+        {/* Mandatory notice */}
+        {noneSubmitted && (
+          <GlassCard variant="warm" style={styles.mandatoryBanner}>
+            <AlertCircle size={18} color={Colors.orange} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.mandatoryTitle}>Action requise</Text>
+              <Text style={styles.mandatoryText}>
+                Soumettez les 3 documents ci-dessous pour accéder à toutes les fonctionnalités.
+              </Text>
+            </View>
+          </GlassCard>
+        )}
 
         {/* Global status banner */}
         {!loading && !noneSubmitted && (
@@ -212,7 +279,7 @@ export default function IdentityVerificationScreen() {
               <>
                 <CheckCircle size={20} color={Colors.green} />
                 <Text style={[styles.bannerText, { color: Colors.green }]}>
-                  Tous vos documents ont été approuvés 🎉
+                  Tous vos documents ont été approuvés 🎉 Vous pouvez maintenant utiliser tous les services.
                 </Text>
               </>
             ) : anyRejected ? (
@@ -226,7 +293,9 @@ export default function IdentityVerificationScreen() {
               <>
                 <Clock size={20} color={Colors.orange} />
                 <Text style={[styles.bannerText, { color: Colors.orange }]}>
-                  Vos documents sont en cours de vérification (24–48h).
+                  {allSubmitted
+                    ? 'Tous vos documents sont en cours de vérification (24–48h).'
+                    : 'Certains documents sont en attente. Complétez les documents manquants.'}
                 </Text>
               </>
             ) : null}
@@ -254,6 +323,12 @@ export default function IdentityVerificationScreen() {
                     <View style={styles.docTitleWrap}>
                       <Text style={styles.docLabel}>{info.label}</Text>
                       <Text style={styles.docDesc}>{info.description}</Text>
+                      {info.cameraOnly && (
+                        <View style={styles.cameraOnlyBadge}>
+                          <Camera size={10} color={Colors.primary} />
+                          <Text style={styles.cameraOnlyText}>Photo en temps réel uniquement</Text>
+                        </View>
+                      )}
                     </View>
                   </View>
 
@@ -273,39 +348,39 @@ export default function IdentityVerificationScreen() {
                   {/* Preview thumbnail */}
                   {doc?.file_url && doc.status !== 'rejected' ? (
                     <View style={styles.previewWrap}>
-                      <Image
-                        source={{ uri: doc.file_url }}
-                        style={styles.previewImage}
-                        contentFit="cover"
-                      />
+                      <Image source={{ uri: doc.file_url }} style={styles.previewImage} contentFit="cover" />
                     </View>
                   ) : null}
 
-                  {/* Upload button */}
+                  {/* Upload / Re-upload button */}
                   {(status === 'none' || status === 'rejected') && (
                     <Pressable
-                      onPress={() => handleUpload(info.type)}
+                      onPress={() => handleUpload(info.type, info)}
                       disabled={isUploading}
                       style={[styles.uploadBtn, { borderColor: `${info.color}40` }]}
                     >
                       {isUploading ? (
                         <ActivityIndicator size="small" color={info.color} />
+                      ) : info.cameraOnly ? (
+                        <Camera size={16} color={info.color} />
                       ) : (
                         <Upload size={16} color={info.color} />
                       )}
                       <Text style={[styles.uploadBtnText, { color: info.color }]}>
                         {isUploading
                           ? 'Envoi en cours…'
+                          : info.cameraOnly
+                          ? 'Prendre le selfie maintenant'
                           : status === 'rejected'
                           ? 'Renvoyer le document'
-                          : 'Choisir une photo'}
+                          : 'Ajouter le document'}
                       </Text>
                     </Pressable>
                   )}
 
                   {status === 'pending' && (
                     <Pressable
-                      onPress={() => handleUpload(info.type)}
+                      onPress={() => handleUpload(info.type, info)}
                       disabled={isUploading}
                       style={[styles.uploadBtn, { borderColor: 'rgba(33,150,243,0.20)' }]}
                     >
@@ -327,9 +402,10 @@ export default function IdentityVerificationScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.infoTitle}>Comment ça marche ?</Text>
                 <Text style={styles.infoText}>
-                  1. Prenez ou choisissez une photo claire de chaque document.{'\n'}
-                  2. Nos équipes vérifient votre dossier sous 24–48h.{'\n'}
-                  3. Vous recevez le badge vérifié une fois approuvé.
+                  1. Prenez votre selfie en temps réel avec la caméra frontale.{'\n'}
+                  2. Ajoutez votre CNIB et casier judiciaire (photo ou galerie).{'\n'}
+                  3. Nos équipes vérifient votre dossier sous 24–48h.{'\n'}
+                  4. Vous obtenez le badge vérifié et l'accès complet.
                 </Text>
               </View>
             </GlassCard>
@@ -347,9 +423,13 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 18, paddingBottom: 40 },
   backButton: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, marginBottom: 20 },
   backText: { fontSize: 15, color: Colors.text, fontWeight: '600' as const },
-  pageHeader: { alignItems: 'center' as const, marginBottom: 22, gap: 8 },
+  pageHeader: { alignItems: 'center' as const, marginBottom: 18, gap: 8 },
   pageTitle: { fontSize: 22, fontWeight: '800' as const, color: Colors.text },
   pageSubtitle: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center' as const, lineHeight: 20 },
+
+  mandatoryBanner: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, gap: 10, marginBottom: 14 },
+  mandatoryTitle: { fontSize: 13, fontWeight: '700' as const, color: Colors.orange, marginBottom: 4 },
+  mandatoryText: { fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
 
   statusBanner: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, marginBottom: 14 },
   bannerText: { flex: 1, fontSize: 13, fontWeight: '600' as const, lineHeight: 18 },
@@ -360,6 +440,13 @@ const styles = StyleSheet.create({
   docTitleWrap: { flex: 1 },
   docLabel: { fontSize: 15, fontWeight: '700' as const, color: Colors.text },
   docDesc: { fontSize: 12, color: Colors.textSecondary, marginTop: 2, lineHeight: 17 },
+
+  cameraOnlyBadge: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4,
+    marginTop: 5, backgroundColor: 'rgba(33,150,243,0.10)',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start' as const,
+  },
+  cameraOnlyText: { fontSize: 10, fontWeight: '600' as const, color: Colors.primary },
 
   statusRow: {
     flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6,
@@ -375,7 +462,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row' as const, alignItems: 'center' as const,
     justifyContent: 'center' as const, gap: 8,
     borderWidth: 1.5, borderStyle: 'dashed' as const,
-    borderRadius: 12, paddingVertical: 12,
+    borderRadius: 12, paddingVertical: 14,
   },
   uploadBtnText: { fontSize: 14, fontWeight: '600' as const },
 

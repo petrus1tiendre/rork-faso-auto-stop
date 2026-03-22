@@ -1,13 +1,7 @@
-import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  Pressable,
-  Alert,
-  StatusBar,
-  ActivityIndicator,
+  StyleSheet, Text, View, ScrollView, Pressable,
+  Alert, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,17 +9,9 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  Star,
-  BadgeCheck,
-  Shield,
-  FileText,
-  Bell,
-  HelpCircle,
-  LogOut,
-  ChevronRight,
-  Car,
-  AlertTriangle,
-  Camera,
+  Star, BadgeCheck, Shield, FileText, Bell, HelpCircle,
+  LogOut, ChevronRight, Car, AlertTriangle, Camera,
+  CalendarCheck, Trash2, Edit3,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -34,12 +20,7 @@ import GlassCard from '@/components/GlassCard';
 import { supabase } from '@/lib/supabase';
 
 function getInitials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('') || '?';
+  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?';
 }
 
 interface MenuItemProps {
@@ -82,72 +63,82 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (profileLoading) {
       setLoadTimeout(false);
-      const timer = setTimeout(() => {
-        setLoadTimeout(true);
-      }, 5000);
+      const timer = setTimeout(() => setLoadTimeout(true), 5000);
       return () => clearTimeout(timer);
     }
   }, [profileLoading]);
 
+  /* ── Avatar change ── */
   const handlePickAvatar = useCallback(async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const uri = result.assets[0].uri;
-        setLocalAvatar(uri);
-
-        if (session?.user?.id) {
-          try {
-            const fileName = `${session.user.id}-${Date.now()}.jpg`;
-
-            // Use FormData for React Native compatibility
-            const formData = new FormData();
-            formData.append('file', {
-              uri,
-              name: fileName,
-              type: 'image/jpeg',
-            } as any);
-
-            const { error: uploadError } = await supabase.storage
-              .from('avatars')
-              .upload(fileName, formData, { upsert: true });
-
-            if (!uploadError) {
-              const { data: publicUrl } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(fileName);
-
-              await supabase.from('profiles')
-                .update({ avatar_url: publicUrl.publicUrl })
-                .eq('id', session.user.id);
-
-              refetchProfile();
-            } else {
-            }
-          } catch (e) {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      setLocalAvatar(uri);
+      if (session?.user?.id) {
+        try {
+          const fileName = `${session.user.id}-${Date.now()}.jpg`;
+          const formData = new FormData();
+          formData.append('file', { uri, name: fileName, type: 'image/jpeg' } as any);
+          const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, formData, { upsert: true });
+          if (!uploadError) {
+            const { data: publicUrl } = supabase.storage.from('avatars').getPublicUrl(fileName);
+            await supabase.from('profiles').update({ avatar_url: publicUrl.publicUrl }).eq('id', session.user.id);
+            refetchProfile();
           }
-        }
+        } catch {}
       }
-    } catch (e) {
     }
   }, [session, refetchProfile]);
+
+  /* ── Avatar delete ── */
+  const handleDeleteAvatar = useCallback(() => {
+    Alert.alert(
+      'Supprimer la photo',
+      'Voulez-vous supprimer votre photo de profil ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            setLocalAvatar(null);
+            if (session?.user?.id) {
+              await supabase.from('profiles').update({ avatar_url: null }).eq('id', session.user.id);
+              refetchProfile();
+            }
+          },
+        },
+      ]
+    );
+  }, [session, refetchProfile]);
+
+  /* ── Avatar options ── */
+  const handleAvatarPress = useCallback(() => {
+    const hasAvatar = !!(localAvatar ?? profile?.avatar_url);
+    if (hasAvatar) {
+      Alert.alert(
+        'Photo de profil',
+        'Que souhaitez-vous faire ?',
+        [
+          { text: 'Changer la photo', onPress: handlePickAvatar },
+          { text: 'Supprimer la photo', style: 'destructive', onPress: handleDeleteAvatar },
+          { text: 'Annuler', style: 'cancel' },
+        ]
+      );
+    } else {
+      handlePickAvatar();
+    }
+  }, [localAvatar, profile?.avatar_url, handlePickAvatar, handleDeleteAvatar]);
 
   const handleLogout = useCallback(() => {
     Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
       { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Oui',
-        style: 'destructive',
-        onPress: () => {
-          signOut();
-        },
-      },
+      { text: 'Oui', style: 'destructive', onPress: () => signOut() },
     ]);
   }, [signOut]);
 
@@ -155,16 +146,15 @@ export default function ProfileScreen() {
     const newCount = tapCount + 1;
     if (tapTimer.current) clearTimeout(tapTimer.current);
     tapTimer.current = setTimeout(() => setTapCount(0), 2000);
-
     if (newCount >= 5) {
       setTapCount(0);
       if (tapTimer.current) clearTimeout(tapTimer.current);
       const email = session?.user?.email;
       if (email === 'hans2tiendrebeogo@gmail.com') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.push('/admin');
       } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         Alert.alert('Accès refusé', "Vous n'avez pas les droits administrateur.");
       }
     } else {
@@ -180,15 +170,6 @@ export default function ProfileScreen() {
     ? getInitials(profile.full_name)
     : (session?.user?.email?.[0]?.toUpperCase() ?? '?');
   const isVerified = profile?.is_verified ?? false;
-
-  const completionPct = useMemo(() => {
-    let score = 0;
-    if (profile?.full_name) score += 25;
-    if (profile?.avatar_url || localAvatar) score += 25;
-    if (profile?.is_verified) score += 25;
-    if ((userTripsCount ?? 0) > 0) score += 25;
-    return score;
-  }, [profile, localAvatar, userTripsCount]);
   const rating = profile?.rating ?? 5.0;
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
@@ -197,10 +178,7 @@ export default function ProfileScreen() {
   if (!profile && session && profileLoading && !loadTimeout) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <LinearGradient
-          colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-          style={StyleSheet.absoluteFill}
-        />
+        <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} style={StyleSheet.absoluteFill} />
         <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={{ color: Colors.textSecondary, marginTop: 12 }}>Chargement du profil...</Text>
       </View>
@@ -210,10 +188,7 @@ export default function ProfileScreen() {
   if (!profile && session && (loadTimeout || profileError)) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }]}>
-        <LinearGradient
-          colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-          style={StyleSheet.absoluteFill}
-        />
+        <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} style={StyleSheet.absoluteFill} />
         <Text style={{ color: Colors.text, fontSize: 16, fontWeight: '600' as const, textAlign: 'center' as const, marginBottom: 8 }}>
           Impossible de charger le profil
         </Text>
@@ -221,10 +196,7 @@ export default function ProfileScreen() {
           Vérifiez votre connexion et réessayez.
         </Text>
         <Pressable
-          onPress={() => {
-            setLoadTimeout(false);
-            refetchProfile();
-          }}
+          onPress={() => { setLoadTimeout(false); refetchProfile(); }}
           style={{ backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
         >
           <Text style={{ color: Colors.white, fontWeight: '700' as const, fontSize: 14 }}>Réessayer</Text>
@@ -236,14 +208,8 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <LinearGradient
-        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-        style={StyleSheet.absoluteFill}
-      />
-      <LinearGradient
-        colors={['rgba(66, 165, 245, 0.15)', 'transparent']}
-        style={styles.topGlow}
-      />
+      <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['rgba(66, 165, 245, 0.15)', 'transparent']} style={styles.topGlow} />
 
       <ScrollView
         style={styles.scroll}
@@ -252,12 +218,14 @@ export default function ProfileScreen() {
       >
         <GlassCard variant="accent" style={styles.profileCard}>
           <View style={styles.profileHeader}>
-            <Pressable onPress={handlePickAvatar} style={styles.avatarWrapper}>
+            {/* Avatar with change/delete overlay */}
+            <Pressable onPress={handleAvatarPress} style={styles.avatarWrapper}>
               {hasAvatar ? (
                 <Image source={{ uri: displayAvatarUri }} style={styles.avatar} />
               ) : (
-                <View style={[styles.avatar, styles.initialsAvatar]}>
-                  <Text style={styles.initialsAvatarText}>{avatarInitials}</Text>
+                // Emoji unknown person when no avatar
+                <View style={[styles.avatar, styles.emojiAvatar]}>
+                  <Text style={styles.emojiAvatarText}>🧑</Text>
                 </View>
               )}
               {isVerified && (
@@ -265,10 +233,12 @@ export default function ProfileScreen() {
                   <BadgeCheck size={16} color={Colors.primary} fill={Colors.white} />
                 </View>
               )}
+              {/* Camera/edit overlay */}
               <View style={styles.cameraOverlay}>
-                <Camera size={14} color={Colors.white} />
+                {hasAvatar ? <Edit3 size={13} color={Colors.white} /> : <Camera size={13} color={Colors.white} />}
               </View>
             </Pressable>
+
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{displayName}</Text>
               <Text style={styles.profilePhone}>{displayEmail}</Text>
@@ -281,6 +251,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          {/* Stats row */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{userTripsCount}</Text>
@@ -293,57 +264,41 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: Colors.green }]}>
+              <Text style={[styles.statValue, { color: isVerified ? Colors.green : Colors.danger }]}>
                 {isVerified ? 'Oui' : 'Non'}
               </Text>
               <Text style={styles.statLabel}>Vérifié</Text>
             </View>
           </View>
-
-          {/* Profile completion bar */}
-          <View style={styles.completionSection}>
-            <View style={styles.completionHeader}>
-              <Text style={styles.completionLabel}>Profil complété à {completionPct}%</Text>
-              {completionPct < 100 && (
-                <Text style={styles.completionHint}>
-                  {completionPct < 50 ? 'À compléter' : completionPct < 75 ? 'Presque là !' : 'Presque parfait !'}
-                </Text>
-              )}
-              {completionPct === 100 && (
-                <Text style={[styles.completionHint, { color: Colors.green }]}>✓ Complet</Text>
-              )}
-            </View>
-            <View style={styles.completionBarBg}>
-              <View
-                style={[
-                  styles.completionBarFill,
-                  {
-                    width: `${completionPct}%` as any,
-                    backgroundColor:
-                      completionPct === 100 ? Colors.green
-                      : completionPct >= 75  ? Colors.primary
-                      : Colors.orange,
-                  },
-                ]}
-              />
-            </View>
-          </View>
         </GlassCard>
 
+        {/* Verification alert if not verified */}
+        {!isVerified && (
+          <Pressable
+            onPress={() => router.push('/identity-verification')}
+            style={styles.verifyAlert}
+          >
+            <AlertTriangle size={16} color={Colors.orange} />
+            <Text style={styles.verifyAlertText}>Vérifiez votre identité pour accéder à tous les services</Text>
+            <Text style={styles.verifyAlertArrow}>→</Text>
+          </Pressable>
+        )}
+
+        {/* Main menu */}
         <GlassCard style={styles.menuSection}>
           <MenuItem
-            icon={<Shield size={18} color={Colors.primary} />}
-            label="Vérification du profil (téléphone)"
-            sublabel={isVerified ? 'Profil vérifié' : 'Vérifier mon numéro'}
-            onPress={() => router.push('/profile-verification')}
+            icon={<FileText size={18} color={Colors.primary} />}
+            label="Vérification d'identité"
+            sublabel={isVerified ? '✓ Identité vérifiée' : 'Photo · CNB · Casier judiciaire'}
+            onPress={() => router.push('/identity-verification')}
             badge={isVerified ? '✓' : '!'}
           />
           <View style={styles.menuDivider} />
           <MenuItem
-            icon={<FileText size={18} color={Colors.green} />}
-            label="Vérification d'identité"
-            sublabel="Photo · CNB · Casier judiciaire"
-            onPress={() => router.push('/identity-verification')}
+            icon={<CalendarCheck size={18} color={Colors.green} />}
+            label="Mes réservations"
+            sublabel="Trajets réservés et publiés"
+            onPress={() => router.push('/(tabs)/bookings')}
           />
           <View style={styles.menuDivider} />
           <MenuItem
@@ -358,7 +313,7 @@ export default function ProfileScreen() {
           <MenuItem
             icon={<Bell size={18} color={Colors.primary} />}
             label="Notifications"
-            sublabel="Nouveaux matchs et confirmations"
+            sublabel="Confirmations et alertes"
             onPress={() => router.push('/notifications-settings')}
           />
           <View style={styles.menuDivider} />
@@ -388,9 +343,7 @@ export default function ProfileScreen() {
         </GlassCard>
 
         {memberSince ? (
-          <Text style={styles.memberSince}>
-            Membre depuis {memberSince}
-          </Text>
+          <Text style={styles.memberSince}>Membre depuis {memberSince}</Text>
         ) : null}
         <Pressable onPress={handleVersionTap}>
           <Text style={styles.version}>Faso Auto-stop v1.0</Text>
@@ -403,222 +356,63 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+  container: { flex: 1, backgroundColor: Colors.background },
+  topGlow: { position: 'absolute' as const, top: 0, left: 0, right: 0, height: 300 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16 },
+  profileCard: { marginBottom: 14 },
+  profileHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 14, marginBottom: 16 },
+  avatarWrapper: { position: 'relative' as const },
+  avatar: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: 'rgba(66, 165, 245, 0.40)' },
+  emojiAvatar: {
+    backgroundColor: 'rgba(33, 150, 243, 0.10)',
+    alignItems: 'center' as const, justifyContent: 'center' as const,
   },
-  topGlow: {
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-  },
-  profileCard: {
-    marginBottom: 14,
-  },
-  profileHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 14,
-    marginBottom: 16,
-  },
-  avatarWrapper: {
-    position: 'relative' as const,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
-    borderColor: 'rgba(66, 165, 245, 0.40)',
-  },
+  emojiAvatarText: { fontSize: 32 },
   verifiedBadge: {
-    position: 'absolute' as const,
-    bottom: -2,
-    right: -2,
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 2,
+    position: 'absolute' as const, bottom: -2, right: -2,
+    backgroundColor: Colors.white, borderRadius: 12, padding: 2,
   },
   cameraOverlay: {
-    position: 'absolute' as const,
-    bottom: -2,
-    left: -2,
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    padding: 4,
-    borderWidth: 2,
-    borderColor: Colors.white,
+    position: 'absolute' as const, bottom: -2, left: -2,
+    backgroundColor: Colors.primary, borderRadius: 10, padding: 4,
+    borderWidth: 2, borderColor: Colors.white,
   },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontSize: 20,
-    fontWeight: '800' as const,
-    color: Colors.text,
-  },
-  profilePhone: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  ratingRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 4,
-    marginTop: 4,
-  },
-  ratingText: {
-    fontSize: 13,
-    fontWeight: '700' as const,
-    color: Colors.orange,
-  },
-  ratingDot: {
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
-  tripCount: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
+  profileInfo: { flex: 1 },
+  profileName: { fontSize: 20, fontWeight: '800' as const, color: Colors.text },
+  profilePhone: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  ratingRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4, marginTop: 4 },
+  ratingText: { fontSize: 13, fontWeight: '700' as const, color: Colors.orange },
+  ratingDot: { fontSize: 13, color: Colors.textMuted },
+  tripCount: { fontSize: 12, color: Colors.textMuted },
   statsRow: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-around' as const,
-    alignItems: 'center' as const,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(33, 150, 243, 0.08)',
+    flexDirection: 'row' as const, justifyContent: 'space-around' as const, alignItems: 'center' as const,
+    paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(33, 150, 243, 0.08)',
   },
-  statItem: {
-    alignItems: 'center' as const,
+  statItem: { alignItems: 'center' as const },
+  statValue: { fontSize: 18, fontWeight: '800' as const, color: Colors.primary },
+  statLabel: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  statDivider: { width: 1, height: 24, backgroundColor: 'rgba(33, 150, 243, 0.08)' },
+
+  verifyAlert: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10,
+    backgroundColor: 'rgba(255,153,51,0.12)',
+    borderWidth: 1, borderColor: 'rgba(255,153,51,0.25)',
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14,
   },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '800' as const,
-    color: Colors.primary,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(33, 150, 243, 0.08)',
-  },
-  menuSection: {
-    marginBottom: 14,
-    paddingVertical: 4,
-    paddingHorizontal: 0,
-  },
-  menuItem: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(33, 150, 243, 0.08)',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  menuContent: {
-    flex: 1,
-  },
-  menuLabel: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: Colors.text,
-  },
-  menuLabelDanger: {
-    color: Colors.danger,
-  },
-  menuSublabel: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 1,
-  },
-  menuBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: 'rgba(33, 150, 243, 0.12)',
-  },
-  menuBadgeText: {
-    fontSize: 11,
-    fontWeight: '700' as const,
-    color: Colors.primary,
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: 'rgba(33, 150, 243, 0.06)',
-    marginLeft: 64,
-  },
-  initialsAvatar: {
-    backgroundColor: 'rgba(33, 150, 243, 0.15)',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  initialsAvatarText: {
-    fontSize: 22,
-    fontWeight: '800' as const,
-    color: Colors.primary,
-  },
-  completionSection: {
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(33, 150, 243, 0.08)',
-  },
-  completionHeader: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    marginBottom: 8,
-  },
-  completionLabel: {
-    fontSize: 12,
-    fontWeight: '700' as const,
-    color: Colors.text,
-  },
-  completionHint: {
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  completionBarBg: {
-    height: 6,
-    backgroundColor: 'rgba(33, 150, 243, 0.12)',
-    borderRadius: 4,
-    overflow: 'hidden' as const,
-  },
-  completionBarFill: {
-    height: 6,
-    borderRadius: 4,
-  },
-  memberSince: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: 'center' as const,
-    marginTop: 8,
-  },
-  version: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    textAlign: 'center' as const,
-    marginTop: 4,
-    opacity: 0.6,
-  },
+  verifyAlertText: { flex: 1, fontSize: 13, fontWeight: '600' as const, color: Colors.orange },
+  verifyAlertArrow: { fontSize: 18, color: Colors.orange, fontWeight: '700' as const },
+
+  menuSection: { marginBottom: 14, paddingVertical: 4, paddingHorizontal: 0 },
+  menuItem: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
+  menuIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(33, 150, 243, 0.08)', alignItems: 'center' as const, justifyContent: 'center' as const },
+  menuContent: { flex: 1 },
+  menuLabel: { fontSize: 14, fontWeight: '600' as const, color: Colors.text },
+  menuLabelDanger: { color: Colors.danger },
+  menuSublabel: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
+  menuBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, backgroundColor: 'rgba(33, 150, 243, 0.12)' },
+  menuBadgeText: { fontSize: 11, fontWeight: '700' as const, color: Colors.primary },
+  menuDivider: { height: 1, backgroundColor: 'rgba(33, 150, 243, 0.06)', marginLeft: 64 },
+  memberSince: { fontSize: 12, color: Colors.textMuted, textAlign: 'center' as const, marginTop: 8 },
+  version: { fontSize: 11, color: Colors.textMuted, textAlign: 'center' as const, marginTop: 4, opacity: 0.6 },
 });

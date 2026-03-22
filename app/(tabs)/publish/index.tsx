@@ -20,12 +20,14 @@ import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
+import DateTimeWheelModal from '@/components/DateTimeWheelModal';
 import { TripType } from '@/types';
 
 export default function PublishScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { createTripMutation, isPublishing } = useApp();
+  const { createTripMutation, isPublishing, profile } = useApp();
+  const isVerified = profile?.is_verified ?? false;
 
   const [tripType, setTripType] = useState<TripType>('urbain');
   const [departure, setDeparture] = useState<string>('');
@@ -40,20 +42,12 @@ export default function PublishScreen() {
   const [price, setPrice] = useState<string>('');
   const [comments, setComments] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [dateText, setDateText] = useState<string>('');
-  const [timeText, setTimeText] = useState<string>('');
 
   const suggestedPrice = tripType === 'interville' ? '5 000' : '500';
 
   const canPublish = useMemo(() => {
-    const hasDate = Platform.OS === 'web'
-      ? /^\d{4}-\d{2}-\d{2}$/.test(dateText.trim())
-      : dateSet;
-    const hasTime = Platform.OS === 'web'
-      ? /^\d{2}:\d{2}$/.test(timeText.trim())
-      : timeSet;
-    return departure.trim().length > 0 && arrival.trim().length > 0 && hasDate && hasTime;
-  }, [departure, arrival, dateText, timeText, dateSet, timeSet]);
+    return departure.trim().length > 0 && arrival.trim().length > 0 && dateSet && timeSet;
+  }, [departure, arrival, dateSet, timeSet]);
 
   const formatDateDisplay = (d: Date) =>
     d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -83,24 +77,19 @@ export default function PublishScreen() {
   }, []);
 
   const handlePublish = useCallback(() => {
-    let tripDate: string;
-    let tripTime: string;
-
-    if (Platform.OS === 'web') {
-      // dateText is "YYYY-MM-DD" from <input type="date">
-      // timeText is "HH:MM" from <input type="time">
-      tripDate = dateText.trim();
-      tripTime = timeText.trim();
-      const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(tripDate);
-      const timeOk = /^\d{2}:\d{2}$/.test(tripTime);
-      if (!dateOk || !timeOk) {
-        Alert.alert('Date/heure invalide', 'Veuillez sélectionner une date et une heure valides.');
-        return;
-      }
-    } else {
-      tripDate = dateSet ? formatDateForDB(selectedDate) : '';
-      tripTime = timeSet ? formatTimeForDB(selectedTime) : '';
+    if (!isVerified) {
+      Alert.alert(
+        '🔒 Vérification requise',
+        'Vous devez vérifier votre identité avant de publier un trajet.',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Vérifier maintenant', onPress: () => router.push('/identity-verification') },
+        ]
+      );
+      return;
     }
+    const tripDate = dateSet ? formatDateForDB(selectedDate) : '';
+    const tripTime = timeSet ? formatTimeForDB(selectedTime) : '';
 
     const newErrors: Record<string, string> = {};
     if (!departure.trim()) newErrors.departure = 'Le lieu de départ est requis';
@@ -139,8 +128,6 @@ export default function PublishScreen() {
           setArrival('');
           setDateSet(false);
           setTimeSet(false);
-          setDateText('');
-          setTimeText('');
           setSeats(3);
           setPrice('');
           setComments('');
@@ -150,18 +137,7 @@ export default function PublishScreen() {
         },
       }
     );
-  }, [tripType, departure, arrival, selectedDate, selectedTime, dateSet, timeSet, seats, price, comments, createTripMutation, router, dateText, timeText]);
-
-  let DateTimePickerNative: any = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    DateTimePickerNative = require('@react-native-community/datetimepicker').default;
-  } catch {
-    // datetimepicker not available on this platform
-  }
-
-  // Today's date in YYYY-MM-DD for the minimum date on the web picker
-  const todayStr = formatDateForDB(new Date());
+  }, [tripType, departure, arrival, selectedDate, selectedTime, dateSet, timeSet, seats, price, comments, createTripMutation, router]);
 
   return (
     <View style={styles.container}>
@@ -187,6 +163,15 @@ export default function PublishScreen() {
         >
           <Text style={styles.title}>Publier un trajet</Text>
           <Text style={styles.subtitle}>Proposez votre trajet et partagez les frais</Text>
+
+          {!isVerified && (
+            <Pressable
+              onPress={() => router.push('/identity-verification')}
+              style={styles.verifyBanner}
+            >
+              <Text style={styles.verifyBannerText}>🔒 Vérifiez votre identité pour publier un trajet →</Text>
+            </Pressable>
+          )}
 
           <GlassCard style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -267,95 +252,48 @@ export default function PublishScreen() {
             <View style={styles.rowInputs}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.inputLabel}>Date <Text style={styles.required}>*</Text></Text>
-                {Platform.OS === 'web' ? (
-                  // Use native HTML date picker on web
-                  React.createElement('input', {
-                    type: 'date',
-                    value: dateText,
-                    min: todayStr,
-                    onChange: (e: any) => setDateText(e.target.value),
-                    style: {
-                      backgroundColor: 'rgba(255,255,255,0.60)',
-                      border: '1px solid rgba(33,150,243,0.20)',
-                      borderRadius: 12,
-                      padding: '12px 14px',
-                      fontSize: 15,
-                      color: Colors.text,
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      fontFamily: 'inherit',
-                    },
-                  })
-                ) : (
-                  <Pressable onPress={handleDatePress} style={styles.pickerButton}>
-                    <Calendar size={16} color={Colors.primary} />
-                    <Text style={[styles.pickerText, !dateSet && styles.pickerPlaceholder]}>
-                      {dateSet ? formatDateDisplay(selectedDate) : 'Choisir une date'}
-                    </Text>
-                  </Pressable>
-                )}
+                <Pressable onPress={handleDatePress} style={styles.pickerButton}>
+                  <Calendar size={16} color={Colors.primary} />
+                  <Text style={[styles.pickerText, !dateSet && styles.pickerPlaceholder]}>
+                    {dateSet ? formatDateDisplay(selectedDate) : 'Choisir une date'}
+                  </Text>
+                </Pressable>
               </View>
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.inputLabel}>Heure <Text style={styles.required}>*</Text></Text>
-                {Platform.OS === 'web' ? (
-                  // Use native HTML time picker on web
-                  React.createElement('input', {
-                    type: 'time',
-                    value: timeText,
-                    onChange: (e: any) => setTimeText(e.target.value),
-                    style: {
-                      backgroundColor: 'rgba(255,255,255,0.60)',
-                      border: '1px solid rgba(33,150,243,0.20)',
-                      borderRadius: 12,
-                      padding: '12px 14px',
-                      fontSize: 15,
-                      color: Colors.text,
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      fontFamily: 'inherit',
-                    },
-                  })
-                ) : (
-                  <Pressable onPress={handleTimePress} style={styles.pickerButton}>
-                    <Clock size={16} color={Colors.primary} />
-                    <Text style={[styles.pickerText, !timeSet && styles.pickerPlaceholder]}>
-                      {timeSet ? formatTimeDisplay(selectedTime) : "Choisir l'heure"}
-                    </Text>
-                  </Pressable>
-                )}
+                <Pressable onPress={handleTimePress} style={styles.pickerButton}>
+                  <Clock size={16} color={Colors.primary} />
+                  <Text style={[styles.pickerText, !timeSet && styles.pickerPlaceholder]}>
+                    {timeSet ? formatTimeDisplay(selectedTime) : "Choisir l'heure"}
+                  </Text>
+                </Pressable>
               </View>
             </View>
 
-            {Platform.OS !== 'web' && showDatePicker && DateTimePickerNative && (
-              <DateTimePickerNative
-                value={selectedDate}
-                mode="date"
-                display="default"
-                minimumDate={new Date()}
-                onChange={(_event: any, date?: Date) => {
-                  setShowDatePicker(false);
-                  if (date) {
-                    setSelectedDate(date);
-                    setDateSet(true);
-                  }
-                }}
-              />
-            )}
-
-            {Platform.OS !== 'web' && showTimePicker && DateTimePickerNative && (
-              <DateTimePickerNative
-                value={selectedTime}
-                mode="time"
-                display="default"
-                onChange={(_event: any, date?: Date) => {
-                  setShowTimePicker(false);
-                  if (date) {
-                    setSelectedTime(date);
-                    setTimeSet(true);
-                  }
-                }}
-              />
-            )}
+            {/* Wheel modals — works on iOS, Android and Web */}
+            <DateTimeWheelModal
+              visible={showDatePicker}
+              mode="date"
+              value={selectedDate}
+              minimumDate={new Date()}
+              onConfirm={(date) => {
+                setSelectedDate(date);
+                setDateSet(true);
+                setShowDatePicker(false);
+              }}
+              onCancel={() => setShowDatePicker(false)}
+            />
+            <DateTimeWheelModal
+              visible={showTimePicker}
+              mode="time"
+              value={selectedTime}
+              onConfirm={(date) => {
+                setSelectedTime(date);
+                setTimeSet(true);
+                setShowTimePicker(false);
+              }}
+              onCancel={() => setShowTimePicker(false)}
+            />
           </GlassCard>
 
           <GlassCard style={styles.section}>
@@ -659,5 +597,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.white,
+  },
+  verifyBanner: {
+    backgroundColor: 'rgba(255,153,51,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,153,51,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  verifyBannerText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.orange,
+    textAlign: 'center' as const,
   },
 });

@@ -28,6 +28,7 @@ async function fetchTrips(): Promise<Trip[]> {
       .from('trips')
       .select('*, profiles(*)')
       .eq('status', 'active')
+      .gt('seats', 0)
       .order('created_at', { ascending: false });
 
     if (error) {
