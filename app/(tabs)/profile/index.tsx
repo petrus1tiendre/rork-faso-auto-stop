@@ -333,17 +333,17 @@ export default function ProfileScreen() {
         <GlassCard style={styles.menuSection}>
           <MenuItem
             icon={<Shield size={18} color={Colors.primary} />}
-            label="Vérification du profil"
-            sublabel={isVerified ? 'Profil vérifié' : 'Compléter la vérification'}
+            label="Vérification du profil (téléphone)"
+            sublabel={isVerified ? 'Profil vérifié' : 'Vérifier mon numéro'}
             onPress={() => router.push('/profile-verification')}
             badge={isVerified ? '✓' : '!'}
           />
           <View style={styles.menuDivider} />
           <MenuItem
             icon={<FileText size={18} color={Colors.green} />}
-            label="Bulletin N°3"
-            sublabel="Requis pour conduire"
-            onPress={() => router.push('/bulletin')}
+            label="Vérification d'identité"
+            sublabel="Photo · CNB · Casier judiciaire"
+            onPress={() => router.push('/identity-verification')}
           />
           <View style={styles.menuDivider} />
           <MenuItem

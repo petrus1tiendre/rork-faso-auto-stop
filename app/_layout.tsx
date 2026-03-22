@@ -9,6 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { ToastProvider } from "@/components/Toast";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Linking from "expo-linking";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -38,8 +39,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inAuthGroup    = segments[0] === 'login' || segments[0] === 'register';
     const inOnboarding   = segments[0] === 'onboarding';
     const inResetPwd     = segments[0] === 'reset-password';
+    const inConversation = segments[0] === 'conversation';
 
-    if (!session && !inAuthGroup && !inOnboarding && !inResetPwd) {
+    if (!session && !inAuthGroup && !inOnboarding && !inResetPwd && !inConversation) {
       if (!onboardingDone) {
         router.replace('/onboarding');
       } else {
@@ -74,6 +76,18 @@ const authStyles = StyleSheet.create({
 });
 
 function RootLayoutNav() {
+  const router = useRouter();
+
+  // Intercept recovery deep links when the app is already open
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      if (url.includes('type=recovery')) {
+        router.push('/reset-password');
+      }
+    });
+    return () => sub.remove();
+  }, [router]);
+
   return (
     <AuthGate>
       <Stack
@@ -95,6 +109,8 @@ function RootLayoutNav() {
         <Stack.Screen name="help" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="report-issue" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="admin" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="conversation" options={{ headerShown: false }} />
+        <Stack.Screen name="identity-verification" options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
     </AuthGate>
   );

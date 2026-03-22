@@ -25,12 +25,33 @@ import {
   CheckCircle,
   MapPin,
   Clock,
+  Eye,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Linking } from 'react-native';
 import Colors from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import GlassCard from '@/components/GlassCard';
 import { Profile, Trip } from '@/types';
+
+interface AdminDocument {
+  id: string;
+  user_id: string;
+  doc_type: string;
+  file_url: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  profiles?: { full_name: string | null; phone: string | null } | null;
+}
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  photo: '📷 Photo d\'identité',
+  cnb: '🪪 CNB / CNIB',
+  casier: '📄 Casier judiciaire',
+};
 
 type AdminTab = 'users' | 'trips' | 'documents' | 'stats';
 
@@ -134,6 +155,30 @@ export default function AdminScreen() {
     onError: (error: Error) => Alert.alert('Erreur', error.message),
   });
 
+  const documentsQuery = useQuery({
+    queryKey: ['admin-documents'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*, profiles(full_name, phone)')
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return (data ?? []) as AdminDocument[];
+    },
+  });
+
+  const updateDocStatusMutation = useMutation({
+    mutationFn: async ({ docId, status, notes }: { docId: string; status: string; notes?: string }) => {
+      const { error } = await supabase
+        .from('documents')
+        .update({ status, notes: notes ?? null, updated_at: new Date().toISOString() })
+        .eq('id', docId);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-documents'] }),
+    onError: (error: Error) => Alert.alert('Erreur', error.message),
+  });
+
   const { mutate: deleteTrip } = deleteTripMutation;
   const { mutate: updateTripStatus } = updateTripStatusMutation;
   const { refetch: refetchProfiles } = profilesQuery;
@@ -151,20 +196,24 @@ export default function AdminScreen() {
     updateTripStatus({ tripId, status: newStatus });
   }, [updateTripStatus]);
 
+  const { refetch: refetchDocuments } = documentsQuery;
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([refetchProfiles(), refetchTrips()]).finally(() => setRefreshing(false));
-  }, [refetchProfiles, refetchTrips]);
+    Promise.all([refetchProfiles(), refetchTrips(), refetchDocuments()]).finally(() => setRefreshing(false));
+  }, [refetchProfiles, refetchTrips, refetchDocuments]);
 
   const profiles = profilesQuery.data ?? [];
   const allTrips = tripsQuery.data ?? [];
+  const allDocs = documentsQuery.data ?? [];
   const activeTrips = allTrips.filter(t => t.status === 'active');
   const verifiedUsers = profiles.filter(p => p.is_verified);
+  const pendingDocs = allDocs.filter(d => d.status === 'pending');
 
-  const tabs: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
+  const tabs: { key: AdminTab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { key: 'users', label: 'Utilisateurs', icon: <Users size={14} color={activeTab === 'users' ? Colors.white : Colors.textSecondary} /> },
     { key: 'trips', label: 'Trajets', icon: <Car size={14} color={activeTab === 'trips' ? Colors.white : Colors.textSecondary} /> },
-    { key: 'documents', label: 'Documents', icon: <FileText size={14} color={activeTab === 'documents' ? Colors.white : Colors.textSecondary} /> },
+    { key: 'documents', label: 'Documents', icon: <FileText size={14} color={activeTab === 'documents' ? Colors.white : Colors.textSecondary} />, badge: pendingDocs.length },
     { key: 'stats', label: 'Stats', icon: <BarChart3 size={14} color={activeTab === 'stats' ? Colors.white : Colors.textSecondary} /> },
   ];
 
@@ -249,18 +298,98 @@ export default function AdminScreen() {
     </>
   );
 
-  const renderDocumentsTab = () => (
-    <>
-      <Text style={styles.tabTitle}>Documents soumis</Text>
-      <GlassCard style={styles.emptyCard}>
-        <FileText size={40} color={Colors.textMuted} />
-        <Text style={styles.emptyText}>Aucun document soumis</Text>
-        <Text style={styles.emptySubtext}>
-          Les Bulletins N°3 soumis par les conducteurs apparaîtront ici
+  const renderDocumentsTab = () => {
+    const DOC_STATUS_COLORS: Record<string, string> = {
+      pending: Colors.orange,
+      approved: Colors.green,
+      rejected: Colors.danger,
+    };
+    return (
+      <>
+        <Text style={styles.tabTitle}>
+          {allDocs.length} document{allDocs.length !== 1 ? 's' : ''}
+          {pendingDocs.length > 0 ? ` · ${pendingDocs.length} en attente` : ''}
         </Text>
-      </GlassCard>
-    </>
-  );
+        {documentsQuery.isLoading && (
+          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />
+        )}
+        {!documentsQuery.isLoading && allDocs.length === 0 && (
+          <GlassCard style={styles.emptyCard}>
+            <FileText size={40} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>Aucun document soumis</Text>
+            <Text style={styles.emptySubtext}>
+              Les documents d'identité des utilisateurs apparaîtront ici
+            </Text>
+          </GlassCard>
+        )}
+        {allDocs.map((doc) => {
+          const statusColor = DOC_STATUS_COLORS[doc.status] ?? Colors.textMuted;
+          const userName = (doc as any).profiles?.full_name ?? 'Utilisateur inconnu';
+          const userPhone = (doc as any).profiles?.phone ?? '';
+          return (
+            <GlassCard key={doc.id} style={styles.itemCard}>
+              <View style={styles.itemHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.itemName}>{DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}</Text>
+                  <Text style={styles.itemDetail}>👤 {userName}{userPhone ? ` · ${userPhone}` : ''}</Text>
+                  <Text style={styles.itemDetail}>
+                    📅 {new Date(doc.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
+                <View style={[styles.badge, { backgroundColor: `${statusColor}18` }]}>
+                  <Text style={[styles.badgeText, { color: statusColor }]}>
+                    {doc.status === 'pending' ? 'En attente' : doc.status === 'approved' ? 'Approuvé' : 'Refusé'}
+                  </Text>
+                </View>
+              </View>
+              {doc.notes ? (
+                <Text style={[styles.itemDetail, { color: Colors.danger, marginBottom: 6 }]}>
+                  Note : {doc.notes}
+                </Text>
+              ) : null}
+              <View style={styles.actionsRow}>
+                <Pressable
+                  onPress={() => Linking.openURL(doc.file_url)}
+                  style={[styles.actionBtn, styles.actionBtnSuccess]}
+                >
+                  <Eye size={14} color={Colors.primary} />
+                  <Text style={[styles.actionBtnText, { color: Colors.primary }]}>Voir</Text>
+                </Pressable>
+                {doc.status !== 'approved' && (
+                  <Pressable
+                    onPress={() => updateDocStatusMutation.mutate({ docId: doc.id, status: 'approved' })}
+                    style={[styles.actionBtn, styles.actionBtnSuccess]}
+                    disabled={updateDocStatusMutation.isPending}
+                  >
+                    <ThumbsUp size={14} color={Colors.green} />
+                    <Text style={[styles.actionBtnText, { color: Colors.green }]}>Approuver</Text>
+                  </Pressable>
+                )}
+                {doc.status !== 'rejected' && (
+                  <Pressable
+                    onPress={() => {
+                      Alert.prompt(
+                        'Refuser le document',
+                        'Motif de refus (optionnel) :',
+                        (notes) => updateDocStatusMutation.mutate({ docId: doc.id, status: 'rejected', notes: notes ?? '' }),
+                        'plain-text',
+                        '',
+                      );
+                    }}
+                    style={[styles.actionBtn, styles.actionBtnDanger]}
+                    disabled={updateDocStatusMutation.isPending}
+                  >
+                    <ThumbsDown size={14} color={Colors.danger} />
+                    <Text style={[styles.actionBtnText, { color: Colors.danger }]}>Refuser</Text>
+                  </Pressable>
+                )}
+              </View>
+            </GlassCard>
+          );
+        })}
+      </>
+    );
+  };
 
   const renderStatsTab = () => (
     <>
@@ -350,6 +479,11 @@ export default function AdminScreen() {
               <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
                 {tab.label}
               </Text>
+              {tab.badge != null && tab.badge > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{tab.badge}</Text>
+                </View>
+              )}
             </Pressable>
           ))}
         </View>
@@ -408,4 +542,10 @@ const styles = StyleSheet.create({
   ratioBar: { height: 8, borderRadius: 4, backgroundColor: 'rgba(33,150,243,0.10)', overflow: 'hidden' as const },
   ratioFill: { height: 8, borderRadius: 4, backgroundColor: Colors.primary },
   ratioText: { fontSize: 12, color: Colors.textSecondary, marginTop: 6 },
+  tabBadge: {
+    backgroundColor: Colors.danger, borderRadius: 8,
+    minWidth: 16, height: 16, alignItems: 'center' as const,
+    justifyContent: 'center' as const, paddingHorizontal: 3,
+  },
+  tabBadgeText: { fontSize: 9, fontWeight: '800' as const, color: Colors.white },
 });

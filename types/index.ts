@@ -57,3 +57,14 @@ export interface ChatConversation {
   unread: number;
   tripSummary: string;
 }
+
+export interface Document {
+  id: string;
+  user_id: string;
+  doc_type: 'photo' | 'cnb' | 'casier';
+  file_url: string;
+  status: 'pending' | 'approved' | 'rejected';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
