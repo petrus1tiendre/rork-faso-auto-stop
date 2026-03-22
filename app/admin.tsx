@@ -36,6 +36,22 @@ import { supabase } from '@/lib/supabase';
 import GlassCard from '@/components/GlassCard';
 import { Profile, Trip } from '@/types';
 
+interface AdminBooking {
+  id: string;
+  status: string;
+  created_at: string;
+  trip_id: string;
+  passenger_id: string;
+  trips?: {
+    departure: string;
+    arrival: string;
+    trip_date: string;
+    trip_time: string | null;
+    driver?: { full_name: string | null } | null;
+  } | null;
+  passenger?: { full_name: string | null; phone: string | null } | null;
+}
+
 interface AdminDocument {
   id: string;
   user_id: string;
@@ -53,7 +69,7 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   casier: '📄 Casier judiciaire',
 };
 
-type AdminTab = 'users' | 'trips' | 'documents' | 'stats';
+type AdminTab = 'users' | 'trips' | 'bookings' | 'documents' | 'stats';
 
 const ADMIN_EMAILS = ['hans2tiendrebeogo@gmail.com'];
 
@@ -155,6 +171,45 @@ export default function AdminScreen() {
     onError: (error: Error) => Alert.alert('Erreur', error.message),
   });
 
+  /* ── Admin bookings query ── */
+  const adminBookingsQuery = useQuery({
+    queryKey: ['admin-bookings'],
+    queryFn: async () => {
+      // Fetch bookings with trip info and passenger profile separately
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select('id, status, created_at, trip_id, passenger_id, trips(departure, arrival, trip_date, trip_time, user_id)')
+        .order('created_at', { ascending: false });
+      if (error || !bookings) return [];
+
+      // Fetch all unique passenger IDs and driver IDs
+      const passengerIds = [...new Set(bookings.map((b: any) => b.passenger_id))];
+      const driverIds = [...new Set(bookings.map((b: any) => b.trips?.user_id).filter(Boolean))];
+      const allIds = [...new Set([...passengerIds, ...driverIds])];
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone')
+        .in('id', allIds);
+      const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]));
+
+      return bookings.map((b: any) => ({
+        ...b,
+        passenger: profileMap[b.passenger_id] ?? null,
+        trips: b.trips ? { ...b.trips, driver: profileMap[b.trips.user_id] ?? null } : null,
+      })) as AdminBooking[];
+    },
+  });
+
+  const updateBookingStatusMutation = useMutation({
+    mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
+      const { error } = await supabase.from('bookings').update({ status }).eq('id', bookingId);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-bookings'] }),
+    onError: (error: Error) => Alert.alert('Erreur', error.message),
+  });
+
   const documentsQuery = useQuery({
     queryKey: ['admin-documents'],
     queryFn: async () => {
@@ -197,24 +252,28 @@ export default function AdminScreen() {
   }, [updateTripStatus]);
 
   const { refetch: refetchDocuments } = documentsQuery;
+  const { refetch: refetchAdminBookings } = adminBookingsQuery;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([refetchProfiles(), refetchTrips(), refetchDocuments()]).finally(() => setRefreshing(false));
-  }, [refetchProfiles, refetchTrips, refetchDocuments]);
+    Promise.all([refetchProfiles(), refetchTrips(), refetchDocuments(), refetchAdminBookings()]).finally(() => setRefreshing(false));
+  }, [refetchProfiles, refetchTrips, refetchDocuments, refetchAdminBookings]);
 
   const profiles = profilesQuery.data ?? [];
   const allTrips = tripsQuery.data ?? [];
   const allDocs = documentsQuery.data ?? [];
+  const allAdminBookings = adminBookingsQuery.data ?? [];
   const activeTrips = allTrips.filter(t => t.status === 'active');
   const verifiedUsers = profiles.filter(p => p.is_verified);
   const pendingDocs = allDocs.filter(d => d.status === 'pending');
+  const pendingBookings = allAdminBookings.filter(b => b.status === 'pending');
 
   const tabs: { key: AdminTab; label: string; icon: React.ReactNode; badge?: number }[] = [
-    { key: 'users', label: 'Utilisateurs', icon: <Users size={14} color={activeTab === 'users' ? Colors.white : Colors.textSecondary} /> },
-    { key: 'trips', label: 'Trajets', icon: <Car size={14} color={activeTab === 'trips' ? Colors.white : Colors.textSecondary} /> },
-    { key: 'documents', label: 'Documents', icon: <FileText size={14} color={activeTab === 'documents' ? Colors.white : Colors.textSecondary} />, badge: pendingDocs.length },
-    { key: 'stats', label: 'Stats', icon: <BarChart3 size={14} color={activeTab === 'stats' ? Colors.white : Colors.textSecondary} /> },
+    { key: 'users',     label: 'Utilisateurs', icon: <Users    size={14} color={activeTab === 'users'     ? Colors.white : Colors.textSecondary} /> },
+    { key: 'trips',     label: 'Trajets',      icon: <Car      size={14} color={activeTab === 'trips'     ? Colors.white : Colors.textSecondary} /> },
+    { key: 'bookings',  label: 'Réservations', icon: <CheckCircle size={14} color={activeTab === 'bookings' ? Colors.white : Colors.textSecondary} />, badge: pendingBookings.length },
+    { key: 'documents', label: 'Documents',    icon: <FileText size={14} color={activeTab === 'documents' ? Colors.white : Colors.textSecondary} />, badge: pendingDocs.length },
+    { key: 'stats',     label: 'Stats',        icon: <BarChart3 size={14} color={activeTab === 'stats'    ? Colors.white : Colors.textSecondary} /> },
   ];
 
   const renderUsersTab = () => (
@@ -297,6 +356,88 @@ export default function AdminScreen() {
       ))}
     </>
   );
+
+  const renderBookingsTab = () => {
+    const STATUS_COLORS: Record<string, string> = {
+      pending: Colors.orange, confirmed: Colors.green,
+      cancelled: Colors.danger, completed: Colors.textMuted,
+    };
+    const STATUS_LABELS: Record<string, string> = {
+      pending: '⏳ En attente', confirmed: '✅ Confirmé',
+      cancelled: '❌ Annulé', completed: '🏁 Terminé',
+    };
+    return (
+      <>
+        <Text style={styles.tabTitle}>
+          {allAdminBookings.length} réservation{allAdminBookings.length !== 1 ? 's' : ''}
+          {pendingBookings.length > 0 ? ` · ${pendingBookings.length} en attente` : ''}
+        </Text>
+        {adminBookingsQuery.isLoading && <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />}
+        {!adminBookingsQuery.isLoading && allAdminBookings.length === 0 && (
+          <GlassCard style={styles.emptyCard}>
+            <CheckCircle size={40} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>Aucune réservation</Text>
+          </GlassCard>
+        )}
+        {allAdminBookings.map((booking) => {
+          const statusColor = STATUS_COLORS[booking.status] ?? Colors.textMuted;
+          const statusLabel = STATUS_LABELS[booking.status] ?? booking.status;
+          const passenger = booking.passenger?.full_name ?? 'Passager inconnu';
+          const driver = booking.trips?.driver?.full_name ?? 'Conducteur inconnu';
+          const dep = booking.trips?.departure ?? '?';
+          const arr = booking.trips?.arrival ?? '?';
+          const date = booking.trips?.trip_date ?? '';
+          const time = booking.trips?.trip_time?.slice(0, 5) ?? '';
+          return (
+            <GlassCard key={booking.id} style={styles.itemCard}>
+              <View style={styles.itemHeader}>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.routeRow}>
+                    <MapPin size={12} color={Colors.primary} />
+                    <Text style={styles.routeText}>{dep} → {arr}</Text>
+                  </View>
+                  {date ? (
+                    <View style={styles.tripMeta}>
+                      <Clock size={12} color={Colors.textMuted} />
+                      <Text style={styles.itemDetail}>{date}{time ? ` · ${time}` : ''}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <View style={[styles.badge, { backgroundColor: `${statusColor}18` }]}>
+                  <Text style={[styles.badgeText, { color: statusColor }]}>{statusLabel}</Text>
+                </View>
+              </View>
+              <Text style={styles.itemDetail}>👤 Passager : {passenger}</Text>
+              <Text style={styles.itemDetail}>🚗 Conducteur : {driver}</Text>
+              <Text style={styles.itemDetail}>
+                📅 {new Date(booking.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </Text>
+              {booking.status === 'pending' && (
+                <View style={styles.actionsRow}>
+                  <Pressable
+                    onPress={() => updateBookingStatusMutation.mutate({ bookingId: booking.id, status: 'confirmed' })}
+                    style={[styles.actionBtn, styles.actionBtnSuccess]}
+                    disabled={updateBookingStatusMutation.isPending}
+                  >
+                    <CheckCircle size={14} color={Colors.green} />
+                    <Text style={[styles.actionBtnText, { color: Colors.green }]}>Confirmer</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => updateBookingStatusMutation.mutate({ bookingId: booking.id, status: 'cancelled' })}
+                    style={[styles.actionBtn, styles.actionBtnDanger]}
+                    disabled={updateBookingStatusMutation.isPending}
+                  >
+                    <XCircle size={14} color={Colors.danger} />
+                    <Text style={[styles.actionBtnText, { color: Colors.danger }]}>Annuler</Text>
+                  </Pressable>
+                </View>
+              )}
+            </GlassCard>
+          );
+        })}
+      </>
+    );
+  };
 
   const renderDocumentsTab = () => {
     const DOC_STATUS_COLORS: Record<string, string> = {
@@ -488,10 +629,11 @@ export default function AdminScreen() {
           ))}
         </View>
 
-        {activeTab === 'users' && renderUsersTab()}
-        {activeTab === 'trips' && renderTripsTab()}
+        {activeTab === 'users'     && renderUsersTab()}
+        {activeTab === 'trips'     && renderTripsTab()}
+        {activeTab === 'bookings'  && renderBookingsTab()}
         {activeTab === 'documents' && renderDocumentsTab()}
-        {activeTab === 'stats' && renderStatsTab()}
+        {activeTab === 'stats'     && renderStatsTab()}
 
         <View style={{ height: 40 }} />
       </ScrollView>

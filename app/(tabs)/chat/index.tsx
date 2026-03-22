@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -156,6 +156,21 @@ export default function ChatScreen() {
     enabled: !!userId,
     staleTime: 30000,
   });
+
+  /* ── Real-time subscription: any booking change → refresh both views ── */
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`bookings-realtime-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['bookings-passenger', userId] });
+        queryClient.invalidateQueries({ queryKey: ['bookings-driver', userId] });
+        // Also refresh booked-trip-ids used in home screen
+        queryClient.invalidateQueries({ queryKey: ['booked-trip-ids', userId] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, queryClient]);
 
   /* Confirm / Cancel mutations (driver side) */
   const updateStatusMutation = useMutation({

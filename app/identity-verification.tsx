@@ -49,7 +49,7 @@ interface DocInfo {
 const DOC_INFOS: DocInfo[] = [
   {
     type: 'photo',
-    label: 'Photo d'identité',
+    label: "Photo d'identité",
     description: 'Selfie clair avec votre visage visible',
     icon: <Camera size={22} color={Colors.primary} />,
     color: Colors.primary,

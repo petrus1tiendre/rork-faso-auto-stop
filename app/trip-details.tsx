@@ -27,7 +27,7 @@ import {
   Coins,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import GlassCard from '@/components/GlassCard';
@@ -60,10 +60,30 @@ export default function TripDetailsScreen() {
     ]).start();
   }, [fadeAnim, slideAnim]);
 
+  /* ── Check if user already has an active booking for this trip ── */
+  const existingBookingQuery = useQuery({
+    queryKey: ['existing-booking', trip?.id, userId],
+    queryFn: async () => {
+      if (!userId || !trip) return null;
+      const { data } = await supabase
+        .from('bookings')
+        .select('id, status')
+        .eq('trip_id', trip.id)
+        .eq('passenger_id', userId)
+        .in('status', ['pending', 'confirmed'])
+        .maybeSingle();
+      return data as { id: string; status: string } | null;
+    },
+    enabled: !!userId && !!trip,
+  });
+  const existingBooking = existingBookingQuery.data ?? null;
+
   const bookMutation = useMutation({
     mutationFn: async () => {
       if (!userId || !trip) throw new Error('Non connecté');
       if (trip.user_id === userId) throw new Error('Vous ne pouvez pas réserver votre propre trajet.');
+      // Server-side duplicate guard
+      if (existingBooking) throw new Error('already_booked');
 
       const { data, error } = await supabase
         .from('bookings')
@@ -75,15 +95,32 @@ export default function TripDetailsScreen() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') throw new Error('already_booked');
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Réservation envoyée !', 'Le conducteur recevra votre demande.');
+      // Refresh existing-booking so button becomes disabled
+      existingBookingQuery.refetch();
+      Alert.alert(
+        '✅ Réservation envoyée !',
+        'Le conducteur recevra votre demande. Retrouvez la conversation dans l\'onglet "Messages".',
+        [
+          { text: 'Voir dans Messages', onPress: () => { router.back(); router.push('/(tabs)/chat'); } },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
     },
     onError: (error: Error) => {
-      Alert.alert('Erreur', error.message);
+      if (error.message === 'already_booked') {
+        existingBookingQuery.refetch();
+        Alert.alert('Déjà réservé', 'Vous avez déjà une réservation active pour ce trajet. Retrouvez-la dans l\'onglet Messages.');
+      } else {
+        Alert.alert('Erreur', error.message);
+      }
     },
   });
 
@@ -261,23 +298,43 @@ export default function TripDetailsScreen() {
           ) : null}
 
           <View style={styles.actionButtons}>
-            <Pressable
-              onPress={handleContact}
-              style={[styles.contactButton, bookMutation.isPending && { opacity: 0.7 }]}
-              disabled={bookMutation.isPending}
-            >
-              <LinearGradient
-                colors={[Colors.primary, Colors.primaryDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.actionGradient}
+            {existingBooking ? (
+              /* Already booked → show status badge + go to chat */
+              <Pressable
+                onPress={() => { router.back(); router.push('/(tabs)/chat'); }}
+                style={[styles.contactButton]}
               >
-                <MessageCircle size={18} color={Colors.white} />
-                <Text style={styles.actionText}>
-                  {bookMutation.isPending ? 'Réservation...' : 'Réserver'}
-                </Text>
-              </LinearGradient>
-            </Pressable>
+                <LinearGradient
+                  colors={[Colors.green, Colors.greenDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.actionGradient}
+                >
+                  <MessageCircle size={18} color={Colors.white} />
+                  <Text style={styles.actionText}>
+                    {existingBooking.status === 'confirmed' ? '✅ Confirmé — Voir Messages' : '⏳ En attente — Voir Messages'}
+                  </Text>
+                </LinearGradient>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={handleContact}
+                style={[styles.contactButton, (bookMutation.isPending || trip.user_id === userId) && { opacity: 0.7 }]}
+                disabled={bookMutation.isPending || trip.user_id === userId}
+              >
+                <LinearGradient
+                  colors={trip.user_id === userId ? [Colors.textMuted, Colors.textMuted] : [Colors.primary, Colors.primaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.actionGradient}
+                >
+                  <MessageCircle size={18} color={Colors.white} />
+                  <Text style={styles.actionText}>
+                    {trip.user_id === userId ? 'Votre trajet' : bookMutation.isPending ? 'Réservation...' : 'Réserver'}
+                  </Text>
+                </LinearGradient>
+              </Pressable>
+            )}
             <Pressable onPress={handlePayment} style={styles.paymentButton}>
               <LinearGradient
                 colors={['#FF9933', '#E68A2E']}

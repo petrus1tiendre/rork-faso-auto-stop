@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, Pressable, Animated,
   StatusBar, RefreshControl,
@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MapPin, Navigation, Zap, SlidersHorizontal, PlusCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
 import { useApp, useFilteredTrips } from '@/providers/AppProvider';
 import TripCard from '@/components/TripCard';
@@ -23,13 +24,30 @@ type FilterType = 'all' | TripType;
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { trips, isLoading, refetchTrips, profile, userId } = useApp();
   const { showToast } = useToast();
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [sortType, setSortType] = useState<SortType>('recent');
-  const [showSort, setShowSort] = useState(false);
-  const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [activeFilter, setActiveFilter] = React.useState<FilterType>('all');
+  const [sortType, setSortType] = React.useState<SortType>('recent');
+  const [showSort, setShowSort] = React.useState(false);
+
+  /* ── Load already-booked trip IDs from DB (survives restarts) ── */
+  const bookedTripsQuery = useQuery({
+    queryKey: ['booked-trip-ids', userId],
+    queryFn: async (): Promise<Set<string>> => {
+      if (!userId) return new Set();
+      const { data } = await supabase
+        .from('bookings')
+        .select('trip_id')
+        .eq('passenger_id', userId)
+        .in('status', ['pending', 'confirmed']);
+      return new Set<string>((data ?? []).map((b: any) => b.trip_id as string));
+    },
+    enabled: !!userId,
+    staleTime: 60000,
+  });
+  const bookedTripIds = bookedTripsQuery.data ?? new Set<string>();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -61,7 +79,8 @@ export default function HomeScreen() {
       showToast('❌ Connectez-vous pour réserver', 'error');
       return;
     }
-    if (bookingIds.has(tripId)) {
+    // Check DB-backed list (persists across restarts)
+    if (bookedTripIds.has(tripId)) {
       showToast('ℹ️ Vous avez déjà réservé ce trajet', 'info');
       return;
     }
@@ -76,16 +95,21 @@ export default function HomeScreen() {
 
     if (error) {
       if (error.code === '23505') {
+        // DB unique constraint caught it — refresh the local list
+        queryClient.invalidateQueries({ queryKey: ['booked-trip-ids', userId] });
         showToast('ℹ️ Vous avez déjà réservé ce trajet', 'info');
       } else {
         showToast('❌ Erreur réseau. Vérifiez votre connexion.', 'error');
       }
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setBookingIds(prev => new Set([...prev, tripId]));
-      showToast(`✅ Réservation envoyée à ${driverName} !`, 'success');
+      // Refresh the booked-ids cache so the button becomes disabled immediately
+      queryClient.invalidateQueries({ queryKey: ['booked-trip-ids', userId] });
+      showToast(`✅ Réservé ! Ouvrez "Messages" pour contacter ${driverName}.`, 'success');
+      // Navigate to chat after short delay so toast is visible
+      setTimeout(() => router.push('/(tabs)/chat'), 1800);
     }
-  }, [userId, bookingIds, showToast]);
+  }, [userId, bookedTripIds, showToast, queryClient, router]);
 
   const greeting = profile?.full_name ? `Salut ${profile.full_name.split(' ')[0]} 👋` : 'Salut 👋';
 
@@ -180,7 +204,14 @@ export default function HomeScreen() {
             key={trip.id}
             trip={trip}
             onPress={() => handleTripPress(trip.id)}
-            onBook={trip.user_id !== userId ? () => handleBook(trip.id, trip.profiles?.full_name ?? 'le conducteur') : undefined}
+            onBook={
+              trip.user_id !== userId && !!userId
+                ? bookedTripIds.has(trip.id)
+                  ? null   // already booked → TripCard shows disabled state
+                  : () => handleBook(trip.id, trip.profiles?.full_name ?? 'le conducteur')
+                : undefined
+            }
+            alreadyBooked={bookedTripIds.has(trip.id)}
           />
         ))}
 

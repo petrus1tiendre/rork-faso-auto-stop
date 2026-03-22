@@ -9,7 +9,8 @@ import { Trip } from '@/types';
 interface TripCardProps {
   trip: Trip;
   onPress: () => void;
-  onBook?: () => void;
+  onBook?: (() => void) | null;
+  alreadyBooked?: boolean;
 }
 
 /** Get 1–2 initials from a full name */
@@ -43,7 +44,7 @@ function formatFrenchDate(dateStr: string): string {
   }
 }
 
-export default React.memo(function TripCard({ trip, onPress, onBook }: TripCardProps) {
+export default React.memo(function TripCard({ trip, onPress, onBook, alreadyBooked }: TripCardProps) {
   const isInterville = trip.type === 'interville';
   const driverName = trip.profiles?.full_name ?? 'Conducteur';
   const driverAvatar = trip.profiles?.avatar_url ?? null;
@@ -131,15 +132,19 @@ export default React.memo(function TripCard({ trip, onPress, onBook }: TripCardP
           </View>
         </View>
 
-        {/* Réserver button */}
-        {onBook && (
+        {/* Réserver / Déjà réservé button */}
+        {alreadyBooked ? (
+          <View style={styles.bookedBadge}>
+            <Text style={styles.bookedBadgeText}>✓ Réservé</Text>
+          </View>
+        ) : onBook ? (
           <Pressable
             onPress={(e) => { e.stopPropagation?.(); onBook(); }}
             style={[styles.bookButton, isInterville && styles.bookButtonWarm]}
           >
             <Text style={styles.bookButtonText}>Réserver</Text>
           </Pressable>
-        )}
+        ) : null}
       </View>
     </GlassCard>
   );
@@ -319,5 +324,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700' as const,
     color: Colors.white,
+  },
+  bookedBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 168, 107, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 168, 107, 0.25)',
+    minHeight: 36,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  bookedBadgeText: {
+    fontSize: 12,
+    fontWeight: '700' as const,
+    color: Colors.green,
   },
 });
